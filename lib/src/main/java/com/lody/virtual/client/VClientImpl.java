@@ -200,6 +200,26 @@ public final class VClientImpl extends IVClient.Stub {
             );
         } else {
             if (BuildCompat.isQ()) {
+                // On Android 12+ (S), handleNewIntent takes ActivityClientRecord instead of IBinder.
+                // Look up the ActivityClientRecord from the token.
+                if (Build.VERSION.SDK_INT >= 31) { // Android 12 (S)
+                    try {
+                        Object mainThread = VirtualCore.mainThread();
+                        // Get the mActivities map from ActivityThread
+                        Map<IBinder, ?> activities = (Map<IBinder, ?>) mirror.android.app.ActivityThread.TYPE
+                                .getDeclaredField("mActivities").get(mainThread);
+                        if (activities != null) {
+                            Object activityClientRecord = activities.get(data.token);
+                            if (activityClientRecord != null) {
+                                ActivityThread.handleNewIntent.call(mainThread, activityClientRecord, Collections.singletonList(intent));
+                                return;
+                            }
+                        }
+                    } catch (Throwable e) {
+                        VLog.w(TAG, "Failed to get ActivityClientRecord for handleNewIntent", e);
+                    }
+                }
+                // Fallback for older Android versions
                 ActivityThread.handleNewIntent.call(VirtualCore.mainThread(), data.token, Collections.singletonList(intent));
             } else {
                 ActivityThreadNMR1.performNewIntents.call(
@@ -367,6 +387,26 @@ public final class VClientImpl extends IVClient.Stub {
         // ExposedBridge.patchAppClassLoader(context);
 
         mirror.android.app.ActivityThread.mInitialApplication.set(mainThread, mInitialApplication);
+
+        // Ensure the Application's context has valid ApplicationInfo.
+        // On Android 15 + virtual environments, context.getApplicationInfo() can return null
+        // causing WebView/Chromium BuildInfo crash.
+        try {
+            ApplicationInfo appAI = mInitialApplication.getApplicationInfo();
+            if (appAI == null) {
+                VLog.w(TAG, "Application has null ApplicationInfo, fixing...");
+                Context appBase = mInitialApplication.getBaseContext();
+                if (appBase != null) {
+                    Object pkgInfo = ContextImpl.mPackageInfo.get(appBase);
+                    if (pkgInfo != null) {
+                        LoadedApk.mApplicationInfo.set(pkgInfo, data.appInfo);
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            VLog.e(TAG, "Failed to check/fix ApplicationInfo", e);
+        }
+
         ContextFixer.fixContext(mInitialApplication);
 
         if (Build.VERSION.SDK_INT >= 24 && "com.tencent.mm:recovery".equals(processName)) {
@@ -426,6 +466,28 @@ public final class VClientImpl extends IVClient.Stub {
     }
 
     private void setupUncaughtHandler() {
+        // Also set a DefaultUncaughtExceptionHandler as a safety net.
+        // On Android 12+, ThreadGroup internal fields may have changed,
+        // causing the RootThreadGroup insertion to silently fail.
+        // This ensures all uncaught exceptions (especially from WebView/Chromium
+        // background threads) are caught and don't kill the virtual process.
+        final Thread.UncaughtExceptionHandler previousHandler =
+                Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                CrashHandler handler = VClientImpl.gClient.crashHandler;
+                if (handler != null) {
+                    handler.handleUncaughtException(t, e);
+                } else if (previousHandler != null) {
+                    previousHandler.uncaughtException(t, e);
+                } else {
+                    VLog.e("uncaught", e);
+                    System.exit(0);
+                }
+            }
+        });
+
         ThreadGroup root = Thread.currentThread().getThreadGroup();
         while (root.getParent() != null) {
             root = root.getParent();

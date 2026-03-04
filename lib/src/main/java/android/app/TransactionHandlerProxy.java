@@ -79,6 +79,12 @@ public class TransactionHandlerProxy extends ClientTransactionHandler {
         originalHandler.handleDestroyActivity(r, finishing, configChanges, getNonConfigInstance, reason);
     }
 
+    // Android 15 (configChanges removed)
+    @Override
+    public void handleDestroyActivity(ActivityClientRecord r, boolean finishing, boolean getNonConfigInstance, String reason) {
+        originalHandler.handleDestroyActivity(r, finishing, getNonConfigInstance, reason);
+    }
+
     @Override
     public void handlePauseActivity(ActivityClientRecord r, boolean finished, boolean userLeaving, int configChanges, PendingTransactionActions pendingActions, String reason) {
         originalHandler.handlePauseActivity(r, finished, userLeaving, configChanges, pendingActions, reason);
@@ -88,6 +94,12 @@ public class TransactionHandlerProxy extends ClientTransactionHandler {
     @Override
     public void handlePauseActivity(ActivityClientRecord r, boolean finished, boolean userLeaving, int configChanges, boolean autoEnteringPip, PendingTransactionActions pendingActions, String reason) {
         originalHandler.handlePauseActivity(r, finished, userLeaving, configChanges, autoEnteringPip, pendingActions, reason);
+    }
+
+    // Android 15 (configChanges removed)
+    @Override
+    public void handlePauseActivity(ActivityClientRecord r, boolean finished, boolean userLeaving, boolean autoEnteringPip, PendingTransactionActions pendingActions, String reason) {
+        originalHandler.handlePauseActivity(r, finished, userLeaving, autoEnteringPip, pendingActions, reason);
     }
 
     @Override
@@ -119,6 +131,12 @@ public class TransactionHandlerProxy extends ClientTransactionHandler {
     @Override
     public void handleStopActivity(ActivityClientRecord r, int configChanges, PendingTransactionActions pendingActions, boolean finalStateRequest, String reason) {
         originalHandler.handleStopActivity(r, configChanges, pendingActions, finalStateRequest, reason);
+    }
+
+    // Android 15 (configChanges removed)
+    @Override
+    public void handleStopActivity(ActivityClientRecord r, PendingTransactionActions pendingActions, boolean finalStateRequest, String reason) {
+        originalHandler.handleStopActivity(r, pendingActions, finalStateRequest, reason);
     }
 
     @Override
@@ -312,6 +330,12 @@ public class TransactionHandlerProxy extends ClientTransactionHandler {
     @Override
     public void handleStartActivity(ActivityClientRecord r, PendingTransactionActions pendingActions, int deviceId, ActivityOptions options) {
         originalHandler.handleStartActivity(r, pendingActions, deviceId, options);
+    }
+
+    // Android 15
+    @Override
+    public void handleStartActivity(ActivityClientRecord r, PendingTransactionActions pendingActions, ActivityOptions.SceneTransitionInfo sceneTransitionInfo) {
+        originalHandler.handleStartActivity(r, pendingActions, sceneTransitionInfo);
     }
 
     @Override

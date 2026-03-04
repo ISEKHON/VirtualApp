@@ -25,6 +25,7 @@ import com.lody.virtual.client.hook.proxies.devicepolicy.DevicePolicyManagerStub
 import com.lody.virtual.client.hook.proxies.display.DisplayStub;
 import com.lody.virtual.client.hook.proxies.dropbox.DropBoxManagerStub;
 import com.lody.virtual.client.hook.proxies.fingerprint.FingerprintManagerStub;
+import com.lody.virtual.client.hook.proxies.uri.UriGrantsManagerStub;
 import com.lody.virtual.client.hook.proxies.graphics.GraphicsStatsStub;
 import com.lody.virtual.client.hook.proxies.imms.MmsStub;
 import com.lody.virtual.client.hook.proxies.input.InputMethodManagerStub;
@@ -197,6 +198,7 @@ public final class InvocationStubManager {
 			}
             if (BuildCompat.isQ()) {
             	addInjector(new ActivityTaskManagerStub());
+            	addInjector(new UriGrantsManagerStub());
 
             	// http://aospxref.com/android-10.0.0_r47/xref/frameworks/base/core/java/android/os/IDeviceIdentifiersPolicyService.aidl#24
             	addInjector(new DeviceIdentifiersPolicyServiceStub());

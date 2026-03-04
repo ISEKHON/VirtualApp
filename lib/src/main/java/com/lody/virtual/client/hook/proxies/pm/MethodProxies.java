@@ -27,6 +27,7 @@ import com.lody.virtual.client.core.VirtualCore;
 import com.lody.virtual.client.hook.base.MethodProxy;
 import com.lody.virtual.client.hook.utils.MethodParameterUtils;
 import com.lody.virtual.client.ipc.VPackageManager;
+import com.lody.virtual.client.VClientImpl;
 import com.lody.virtual.helper.collection.ArraySet;
 import com.lody.virtual.helper.compat.ParceledListSliceCompat;
 import com.lody.virtual.helper.utils.ArrayUtils;
@@ -983,6 +984,13 @@ class MethodProxies {
             }
             info = (ApplicationInfo) method.invoke(who, args);
             if (info == null || !isVisiblePackage(info)) {
+                // Fallback: if this is the current virtual app's package, return cached info
+                // to prevent NPE in virtual environment
+                VClientImpl client = VClientImpl.get();
+                if (client.isBound() && client.getCurrentPackage() != null
+                        && client.getCurrentPackage().equals(pkg)) {
+                    return client.getCurrentApplicationInfo();
+                }
                 return null;
             }
             return info;
@@ -1244,6 +1252,54 @@ class MethodProxies {
         public Object call(Object who, Method method, Object... args) throws Throwable {
             MethodParameterUtils.replaceFirstAppPkg(args);
             return method.invoke(who, args);
+        }
+    }
+
+    /**
+     * Android 12+ (API 31): setSplashScreenTheme calls enforceOwnerRights which
+     * checks that the calling UID owns the package.  VirtualApp's UID does not own
+     * the virtual-app packages so the call throws SecurityException on Android 15.
+     * We simply swallow the call – the splash-screen theme inside the virtual
+     * container is irrelevant.
+     */
+    static class SetSplashScreenTheme extends MethodProxy {
+
+        @Override
+        public String getMethodName() {
+            return "setSplashScreenTheme";
+        }
+
+        @Override
+        public Object call(Object who, Method method, Object... args) throws Throwable {
+            // no-op – avoid SecurityException from enforceOwnerRights
+            return null;
+        }
+
+        @Override
+        public boolean isEnable() {
+            return isAppProcess();
+        }
+    }
+
+    /**
+     * Android 15 (API 35): getSplashScreenTheme may also call enforceOwnerRights.
+     * Return null (no custom theme) to avoid SecurityException.
+     */
+    static class GetSplashScreenTheme extends MethodProxy {
+
+        @Override
+        public String getMethodName() {
+            return "getSplashScreenTheme";
+        }
+
+        @Override
+        public Object call(Object who, Method method, Object... args) throws Throwable {
+            return null;
+        }
+
+        @Override
+        public boolean isEnable() {
+            return isAppProcess();
         }
     }
 

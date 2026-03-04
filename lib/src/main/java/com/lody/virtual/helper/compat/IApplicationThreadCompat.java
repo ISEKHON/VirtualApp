@@ -14,6 +14,7 @@ import mirror.android.app.IApplicationThread;
 import mirror.android.app.IApplicationThreadICSMR1;
 import mirror.android.app.IApplicationThreadKitkat;
 import mirror.android.app.IApplicationThreadOreo;
+import mirror.android.app.IApplicationThreadS;
 import mirror.android.app.ServiceStartArgs;
 import mirror.android.content.res.CompatibilityInfo;
 
@@ -39,7 +40,11 @@ public class IApplicationThreadCompat {
 
     public static void scheduleBindService(IInterface appThread, IBinder token, Intent intent, boolean rebind,
                                            int processState) throws RemoteException {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+        if (Build.VERSION.SDK_INT >= 31 /* Android 12 (S) */
+                && IApplicationThreadS.scheduleBindService != null) {
+            // Android 12+ (API 31+): scheduleBindService gained long bindSeq parameter
+            IApplicationThreadS.scheduleBindService.call(appThread, token, intent, rebind, processState, 0L);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             IApplicationThreadKitkat.scheduleBindService.call(appThread, token, intent, rebind, processState);
         } else {
             IApplicationThread.scheduleBindService.call(appThread, token, intent, rebind);

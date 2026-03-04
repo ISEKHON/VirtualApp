@@ -54,6 +54,7 @@ import com.lody.virtual.client.stub.StubPendingService;
 import com.lody.virtual.client.stub.VASettings;
 import com.lody.virtual.helper.compat.ActivityManagerCompat;
 import com.lody.virtual.helper.compat.BuildCompat;
+import com.lody.virtual.helper.compat.ParceledListSliceCompat;
 import com.lody.virtual.helper.utils.ArrayUtils;
 import com.lody.virtual.helper.utils.BitmapUtils;
 import com.lody.virtual.helper.utils.ComponentUtils;
@@ -900,6 +901,54 @@ class MethodProxies {
         }
     }
 
+    // Android 12+ (API 31+): ContextImpl.bindServiceCommon calls bindServiceInstance instead of bindService.
+    // Without this hook, service binding for virtual apps goes directly to the real system,
+    // which throws SecurityException because VirtualApp's UID doesn't own the virtual package.
+    // Signature: bindServiceInstance(IApplicationThread, IBinder, Intent, String, IServiceConnection,
+    //            long flags, String instanceName, String callingPackage, int userId)
+    static class BindServiceInstance extends MethodProxy {
+
+        @Override
+        public String getMethodName() {
+            return "bindServiceInstance";
+        }
+
+        @Override
+        public Object call(Object who, Method method, Object... args) throws Throwable {
+            IInterface caller = (IInterface) args[0];
+            IBinder token = (IBinder) args[1];
+            Intent service = (Intent) args[2];
+            String resolvedType = (String) args[3];
+            IServiceConnection conn = (IServiceConnection) args[4];
+            // flags is long on Android 12+, use Number to handle both int and long
+            int flags = ((Number) args[5]).intValue();
+            int userId = VUserHandle.myUserId();
+            if (isServerProcess()) {
+                userId = service.getIntExtra("_VA_|_user_id_", VUserHandle.USER_NULL);
+            }
+            if (userId == VUserHandle.USER_NULL) {
+                return method.invoke(who, args);
+            }
+            ServiceInfo serviceInfo = VirtualCore.get().resolveServiceInfo(service, userId);
+            if (serviceInfo != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    service.setComponent(new ComponentName(serviceInfo.packageName, serviceInfo.name));
+                }
+                conn = ServiceConnectionDelegate.getDelegate(conn);
+                return VActivityManager.get().bindService(caller.asBinder(), token, service, resolvedType,
+                        conn, flags, userId);
+            }
+            // Replace calling package for pass-through to real system
+            MethodParameterUtils.replaceLastAppPkg(args);
+            return method.invoke(who, args);
+        }
+
+        @Override
+        public boolean isEnable() {
+            return isAppProcess() || isServerProcess();
+        }
+    }
+
 
     static class StartService extends MethodProxy {
 
@@ -1227,6 +1276,31 @@ class MethodProxies {
         public Object call(Object who, Method method, Object... args) throws Throwable {
             MethodParameterUtils.replaceFirstAppPkg(args);
             return method.invoke(who, args);
+        }
+
+        @Override
+        public boolean isEnable() {
+            return isAppProcess();
+        }
+    }
+
+
+    // Android 11+ (API 30): getHistoricalProcessExitReasons requires DUMP permission
+    // when called with a package that doesn't belong to the calling UID.
+    // Return an empty list since virtual process exit reasons don't exist at the system level.
+    static class GetHistoricalProcessExitReasons extends MethodProxy {
+
+        @Override
+        public String getMethodName() {
+            return "getHistoricalProcessExitReasons";
+        }
+
+        @Override
+        public Object call(Object who, Method method, Object... args) throws Throwable {
+            if (ParceledListSliceCompat.isReturnParceledListSlice(method)) {
+                return ParceledListSliceCompat.create(new java.util.ArrayList<>());
+            }
+            return new java.util.ArrayList<>();
         }
 
         @Override

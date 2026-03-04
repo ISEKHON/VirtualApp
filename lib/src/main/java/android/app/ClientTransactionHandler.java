@@ -77,6 +77,11 @@ public abstract class ClientTransactionHandler {
     public abstract void handleDestroyActivity(ActivityThread.ActivityClientRecord r, boolean finishing,
                                                int configChanges, boolean getNonConfigInstance, String reason);
 
+    // Android 15 (configChanges removed)
+    /** Destroy the activity (Android 15 — configChanges parameter removed). */
+    public abstract void handleDestroyActivity(ActivityThread.ActivityClientRecord r, boolean finishing,
+                                               boolean getNonConfigInstance, String reason);
+
     /** Pause the activity. */
     public abstract void handlePauseActivity(ActivityThread.ActivityClientRecord r, boolean finished, boolean userLeaving,
                                              int configChanges, PendingTransactionActions pendingActions, String reason);
@@ -85,6 +90,12 @@ public abstract class ClientTransactionHandler {
     /** Pause the activity (with autoEnteringPip, added in Android 14). */
     public abstract void handlePauseActivity(ActivityThread.ActivityClientRecord r, boolean finished, boolean userLeaving,
                                              int configChanges, boolean autoEnteringPip,
+                                             PendingTransactionActions pendingActions, String reason);
+
+    // Android 15 (configChanges removed)
+    /** Pause the activity (Android 15 — configChanges parameter removed). */
+    public abstract void handlePauseActivity(ActivityThread.ActivityClientRecord r, boolean finished, boolean userLeaving,
+                                             boolean autoEnteringPip,
                                              PendingTransactionActions pendingActions, String reason);
     /**
      * Resume the activity.
@@ -125,6 +136,11 @@ public abstract class ClientTransactionHandler {
 
     // Android 12
     public abstract void handleStopActivity(ActivityThread.ActivityClientRecord r, int configChanges,
+                                            PendingTransactionActions pendingActions, boolean finalStateRequest, String reason);
+
+    // Android 15 (configChanges removed)
+    /** Stop the activity (Android 15 — configChanges parameter removed). */
+    public abstract void handleStopActivity(ActivityThread.ActivityClientRecord r,
                                             PendingTransactionActions pendingActions, boolean finalStateRequest, String reason);
 
     /** Report that activity was stopped to server. */
@@ -201,6 +217,12 @@ public abstract class ClientTransactionHandler {
     /** Perform activity start (with deviceId, added in Android 14). */
     public abstract void handleStartActivity(ActivityThread.ActivityClientRecord r,
                                              PendingTransactionActions pendingActions, int deviceId, ActivityOptions options);
+
+    // Android 15
+    /** Perform activity start (with SceneTransitionInfo, added in Android 15). */
+    public abstract void handleStartActivity(ActivityThread.ActivityClientRecord r,
+                                             PendingTransactionActions pendingActions,
+                                             ActivityOptions.SceneTransitionInfo sceneTransitionInfo);
 
     // Android 11
     public abstract void handleStartActivity(IBinder binder,
