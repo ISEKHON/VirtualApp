@@ -1,0 +1,40 @@
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Gradle
+.gradle/
+build/
+
+# Local config
+local.properties
+
+# SDK/NDK
+.cxx/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# APK / AAB outputs
+*.apk
+*.aab
+*.ap_
+
+# Signing
+*.jks
+*.keystore
+
+# Logs
+*.log
+
+# Native build intermediates
+*.o
+*.so
+obj/
+
+# ProGuard
+proguard/mapping.txt
