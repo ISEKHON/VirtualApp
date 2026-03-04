@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#1976D2</color>
-    <color name="colorPrimaryDark">#0D47A1</color>
-    <color name="colorPrimaryRavel">#1976D2</color>
-    <color name="colorAccent">#2196F3</color>
+    <color name="colorPrimary">#3F3F3F</color>
+    <color name="colorPrimaryDark">#3F3F3F</color>
+    <color name="colorPrimaryRavel">#3F3F3F</color>
+    <color name="colorAccent">#3F3F3F</color>
     <color name="mainTextColor">#212121</color>
+
+    <color name="primary">#3F3F3F</color>
+    <color name="primary_dark">#3F3F3F</color>
+    <color name="primary_light">#3F3F3F</color>
+    <color name="accent">#ffffff</color>
+    <color name="primary_text">#212121</color>
+    <color name="secondary_text">#757575</color>
+    <color name="white">#FFFFFFFF</color>
 
     <color name="desktopColorA">#2C3B4E</color>
     <color name="desktopColorB">#314155</color>

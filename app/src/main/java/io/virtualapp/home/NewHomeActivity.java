@@ -1,6 +1,5 @@
 package io.virtualapp.home;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
@@ -13,10 +12,10 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.PowerManager;
 import android.preference.PreferenceManager;
-import android.provider.Settings;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.PopupMenu;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.text.TextUtils;
@@ -29,8 +28,6 @@ import android.widget.Toast;
 
 import com.lody.virtual.client.core.VirtualCore;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import io.virtualapp.R;
 import io.virtualapp.VCommends;
 import io.virtualapp.home.adapters.HomeAppAdapter;
@@ -39,20 +36,16 @@ import io.virtualapp.home.models.PackageAppData;
 import io.virtualapp.home.repo.AppRepository;
 import io.virtualapp.settings.SettingsActivity;
 
-/**
- * Main home screen — shows cloned apps in a clean grid.
- */
 public class NewHomeActivity extends AppCompatActivity {
 
     private static final String SHOW_DOZE_ALERT_KEY = "SHOW_DOZE_ALERT_KEY";
-    public static final String SHARED_PREFERENCES_KEY = "com.android.launcher3.prefs";
     private static final String TAG = NewHomeActivity.class.getSimpleName();
     private Handler mUiHandler;
-    private boolean mDirectlyBack = false;
 
     private RecyclerView mRecyclerView;
     private ProgressBar mProgressBar;
     private View mEmptyView;
+    private FloatingActionButton mFab;
     private HomeAppAdapter mAdapter;
     private AppRepository mRepository;
 
@@ -69,17 +62,23 @@ public class NewHomeActivity extends AppCompatActivity {
         setContentView(R.layout.activity_home);
         mUiHandler = new Handler(getMainLooper());
 
-        // Toolbar
+        // Toolbar — dark gray with white text
         Toolbar toolbar = findViewById(R.id.home_toolbar);
         setSupportActionBar(toolbar);
 
-        // RecyclerView
+        // Views
         mRecyclerView = findViewById(R.id.home_recycler_view);
         mProgressBar = findViewById(R.id.home_progress_bar);
         mEmptyView = findViewById(R.id.home_empty_view);
+        mFab = findViewById(R.id.home_fab_add);
 
-        mRecyclerView.setLayoutManager(new GridLayoutManager(this, 4));
+        GridLayoutManager layoutManager = new GridLayoutManager(this, 4);
+        layoutManager.setItemPrefetchEnabled(true);
+        layoutManager.setInitialPrefetchItemCount(8);
+        mRecyclerView.setLayoutManager(layoutManager);
+        mRecyclerView.setItemViewCacheSize(20);
         mRecyclerView.setHasFixedSize(true);
+
         mAdapter = new HomeAppAdapter(this);
         mRecyclerView.setAdapter(mAdapter);
         mAdapter.setOnAppClickListener(new HomeAppAdapter.OnAppClickListener() {
@@ -106,49 +105,99 @@ public class NewHomeActivity extends AppCompatActivity {
             @Override
             public void onAppLongClick(AppData data, int position) {
                 if (data instanceof PackageAppData) {
-                    showAppManageDialog((PackageAppData) data, position);
+                    showAppPopupMenu((PackageAppData) data, position);
                 }
             }
         });
 
         // FAB
-        FloatingActionButton fab = findViewById(R.id.home_fab_add);
-        fab.setOnClickListener(v -> ListAppActivity.gotoListApp(this));
+        mFab.setOnClickListener(v -> ListAppActivity.gotoListApp(this));
+
+        // FAB show/hide on scroll
+        mRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                if (dy > 10) {
+                    mFab.hide();
+                } else if (dy < -10) {
+                    mFab.show();
+                }
+            }
+        });
 
         mRepository = new AppRepository(this);
-
-        SharedPreferences prefs = getSharedPreferences(SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE);
-        mDirectlyBack = prefs.getBoolean(SettingsActivity.DIRECTLY_BACK_KEY, false);
     }
 
-    private void showAppManageDialog(PackageAppData appData, int position) {
-        String[] items = {
-                getString(R.string.delete),
-                getString(R.string.create_shortcut)
-        };
+
+    private void showAppPopupMenu(PackageAppData appData, int position) {
+        View itemView = mRecyclerView.findViewHolderForAdapterPosition(position) != null
+                ? mRecyclerView.findViewHolderForAdapterPosition(position).itemView
+                : mRecyclerView;
+        PopupMenu popup = new PopupMenu(this, itemView);
+        popup.getMenuInflater().inflate(R.menu.app_popup_menu, popup.getMenu());
+        popup.setOnMenuItemClickListener(item -> {
+            int id = item.getItemId();
+            if (id == R.id.app_clear) {
+                confirmClearData(appData);
+            } else if (id == R.id.app_stop) {
+                confirmStopApp(appData);
+            } else if (id == R.id.app_remove) {
+                confirmUninstall(appData, position);
+            } else if (id == R.id.app_shortcut) {
+                Toast.makeText(this, R.string.create_shortcut_success, Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        });
+        popup.show();
+    }
+
+    private void confirmClearData(PackageAppData appData) {
         new AlertDialog.Builder(this)
-                .setTitle(appData.name)
-                .setItems(items, (dialog, which) -> {
-                    if (which == 0) {
-                        new AlertDialog.Builder(this)
-                                .setTitle(R.string.delete)
-                                .setMessage("Uninstall " + appData.name + "?")
-                                .setPositiveButton(android.R.string.yes, (d, w) -> {
-                                    try {
-                                        VirtualCore.get().uninstallPackage(appData.packageName);
-                                        mAdapter.getData().remove(position);
-                                        mAdapter.notifyItemRemoved(position);
-                                        updateEmptyView();
-                                    } catch (Throwable e) {
-                                        Toast.makeText(this, "Failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                                    }
-                                })
-                                .setNegativeButton(android.R.string.no, null)
-                                .show();
-                    } else if (which == 1) {
-                        Toast.makeText(this, R.string.create_shortcut_success, Toast.LENGTH_SHORT).show();
+                .setTitle(R.string.home_menu_clear_title)
+                .setMessage(String.format(getString(R.string.home_menu_clear_content), appData.name))
+                .setPositiveButton(android.R.string.yes, (d, w) -> {
+                    try {
+                        VirtualCore.get().clearPackage(appData.packageName);
+                        Toast.makeText(this, R.string.reboot_tips_1, Toast.LENGTH_SHORT).show();
+                    } catch (Throwable e) {
+                        Toast.makeText(this, "Failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                     }
                 })
+                .setNegativeButton(android.R.string.no, null)
+                .show();
+    }
+
+    private void confirmStopApp(PackageAppData appData) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.home_menu_kill_title)
+                .setMessage(String.format(getString(R.string.home_menu_kill_content), appData.name))
+                .setPositiveButton(android.R.string.yes, (d, w) -> {
+                    try {
+                        VirtualCore.get().killApp(appData.packageName, 0);
+                        Toast.makeText(this, R.string.reboot_tips_1, Toast.LENGTH_SHORT).show();
+                    } catch (Throwable e) {
+                        Toast.makeText(this, "Failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(android.R.string.no, null)
+                .show();
+    }
+
+    private void confirmUninstall(PackageAppData appData, int position) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.home_menu_delete_title)
+                .setMessage(String.format(getString(R.string.home_menu_delete_content), appData.name))
+                .setPositiveButton(android.R.string.yes, (d, w) -> {
+                    try {
+                        VirtualCore.get().uninstallPackage(appData.packageName);
+                        mAdapter.getData().remove(position);
+                        mAdapter.notifyItemRemoved(position);
+                        updateEmptyView();
+                    } catch (Throwable e) {
+                        Toast.makeText(this, "Failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(android.R.string.no, null)
                 .show();
     }
 
@@ -185,25 +234,27 @@ public class NewHomeActivity extends AppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        menu.add(0, 1, 0, R.string.clone_apps);
-        menu.add(0, 2, 0, R.string.menu_reboot);
-        menu.add(0, 3, 0, "Settings");
+        getMenuInflater().inflate(R.menu.menu_main, menu);
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case 1:
-                ListAppActivity.gotoListApp(this);
-                return true;
-            case 2:
-                VirtualCore.get().killAllApps();
-                Toast.makeText(this, R.string.reboot_tips_1, Toast.LENGTH_SHORT).show();
-                return true;
-            case 3:
-                startActivity(new Intent(this, SettingsActivity.class));
-                return true;
+        int id = item.getItemId();
+        if (id == R.id.main_setting) {
+            startActivity(new Intent(this, SettingsActivity.class));
+            return true;
+        } else if (id == R.id.main_reboot) {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.settings_reboot_title)
+                    .setMessage(R.string.settings_reboot_content)
+                    .setPositiveButton(android.R.string.yes, (d, w) -> {
+                        VirtualCore.get().killAllApps();
+                        Toast.makeText(this, R.string.reboot_tips_1, Toast.LENGTH_SHORT).show();
+                    })
+                    .setNegativeButton(android.R.string.no, null)
+                    .show();
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -235,9 +286,6 @@ public class NewHomeActivity extends AppCompatActivity {
         if (!result) {
             throw new ActivityNotFoundException("can not launch activity for: " + intent);
         }
-        if (mDirectlyBack) {
-            finish();
-        }
     }
 
     private void alertForDoze() {
@@ -260,11 +308,11 @@ public class NewHomeActivity extends AppCompatActivity {
                             .setMessage(R.string.alert_for_doze_mode_content)
                             .setPositiveButton(R.string.alert_for_doze_mode_yes, (dialog, which) -> {
                                 try {
-                                    startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                    startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                                             Uri.parse("package:" + getPackageName())));
                                 } catch (Throwable e) {
                                     try {
-                                        startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                                        startActivity(new Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
                                     } catch (Throwable ex) {
                                         PreferenceManager.getDefaultSharedPreferences(this)
                                                 .edit().putBoolean(SHOW_DOZE_ALERT_KEY, false).apply();

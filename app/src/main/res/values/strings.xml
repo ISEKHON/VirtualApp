@@ -21,6 +21,7 @@
     <string name="config_device_info">Device Info</string>
     <string name="about">About</string>
     <string name="clone_apps">Clone Apps</string>
+    <string name="install_from_external">Install from file</string>
     <string name="external_storage">External Storage</string>
     <string name="install_d">Install (%d)</string>
     <string name="install_too_much_once_time">You may choose no more than 9 apps at once!</string>

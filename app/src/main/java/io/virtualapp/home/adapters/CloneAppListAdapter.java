@@ -33,6 +33,7 @@ public class CloneAppListAdapter extends DragSelectRecyclerViewAdapter<CloneAppL
     private List<AppInfo> mAppList;
     private List<AppInfo> mFullList;
     private ItemEventListener mItemEventListener;
+    private String mCurrentQuery = "";
 
     private Context mContext;
     private File mFrom;
@@ -61,26 +62,31 @@ public class CloneAppListAdapter extends DragSelectRecyclerViewAdapter<CloneAppL
 
     public void setList(List<AppInfo> models) {
         this.mFullList = models;
-        this.mAppList = models != null ? new ArrayList<>(models) : new ArrayList<>();
-        notifyDataSetChanged();
+        applyFilters();
     }
 
     /**
      * Filter displayed apps by name or package name.
      */
     public void filter(String query) {
+        mCurrentQuery = query;
+        applyFilters();
+    }
+
+    private void applyFilters() {
         if (mFullList == null) return;
-        if (query == null || query.trim().isEmpty()) {
-            mAppList = new ArrayList<>(mFullList);
-        } else {
-            String lower = query.toLowerCase(Locale.US);
-            mAppList = new ArrayList<>();
-            for (AppInfo info : mFullList) {
-                if ((info.name != null && info.name.toString().toLowerCase(Locale.US).contains(lower))
-                        || (info.packageName != null && info.packageName.toLowerCase(Locale.US).contains(lower))) {
-                    mAppList.add(info);
+        String query = mCurrentQuery;
+        String lower = (query != null && !query.trim().isEmpty()) ? query.toLowerCase(Locale.US) : null;
+        mAppList = new ArrayList<>();
+        for (AppInfo info : mFullList) {
+            if (lower != null) {
+                boolean nameMatch = info.name != null && info.name.toString().toLowerCase(Locale.US).contains(lower);
+                boolean pkgMatch = info.packageName != null && info.packageName.toLowerCase(Locale.US).contains(lower);
+                if (!nameMatch && !pkgMatch) {
+                    continue;
                 }
             }
+            mAppList.add(info);
         }
         notifyDataSetChanged();
     }

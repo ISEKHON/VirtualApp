@@ -46,7 +46,6 @@ public class ListAppFragment extends VFragment<ListAppContract.ListAppPresenter>
     private ProgressBar mProgressBar;
     private Button mInstallButton;
     private CloneAppListAdapter mAdapter;
-    private View mSelectFromExternal;
 
     public static ListAppFragment newInstance(File selectFrom) {
         Bundle args = new Bundle();
@@ -85,7 +84,6 @@ public class ListAppFragment extends VFragment<ListAppContract.ListAppPresenter>
         mRecyclerView = (DragSelectRecyclerView) view.findViewById(R.id.select_app_recycler_view);
         mProgressBar = (ProgressBar) view.findViewById(R.id.select_app_progress_bar);
         mInstallButton = (Button) view.findViewById(R.id.select_app_install_btn);
-        mSelectFromExternal = view.findViewById(R.id.select_app_from_external);
         mRecyclerView.setLayoutManager(new StaggeredGridLayoutManager(1, OrientationHelper.VERTICAL));
         DividerItemDecoration dividerItemDecoration = new DividerItemDecoration(getContext(), DividerItemDecoration.VERTICAL);
         dividerItemDecoration.setDrawable(new ColorDrawable(0x1f000000));
@@ -130,16 +128,6 @@ public class ListAppFragment extends VFragment<ListAppContract.ListAppPresenter>
                 Installd.startInstallerActivity(activity, dataList);
                 activity.setResult(Activity.RESULT_OK);
                 finishActivity();
-            }
-        });
-        mSelectFromExternal.setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-            intent.setType("application/vnd.android.package-archive"); // apk file
-            intent.addCategory(Intent.CATEGORY_OPENABLE);
-            try {
-                startActivityForResult(intent, REQUEST_GET_FILE);
-            } catch (Throwable ignored) {
-                Toast.makeText(getActivity(), "Error", Toast.LENGTH_SHORT).show();
             }
         });
         new ListAppPresenterImpl(getActivity(), this, getSelectFrom()).start();

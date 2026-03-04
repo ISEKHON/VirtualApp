@@ -75,9 +75,7 @@ dependencies {
     implementation 'com.jonathanfinerty.once:once:1.0.3'
 
     implementation 'com.kyleduo.switchbutton:library:1.4.6'
-    implementation 'com.allenliu.versionchecklib:library:1.8.3'
-    implementation 'com.github.medyo:android-about-page:1.2.2'
-    implementation 'moe.feng:AlipayZeroSdk:1.1'
+    implementation 'com.squareup.okhttp3:okhttp:3.12.13'
 
     //Glide
     implementation ('com.github.bumptech.glide:glide:4.8.0') {

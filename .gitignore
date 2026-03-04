@@ -38,3 +38,4 @@ obj/
 
 # ProGuard
 proguard/mapping.txt
+test

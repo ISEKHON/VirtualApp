@@ -1,13 +1,9 @@
 package io.virtualapp.splash;
 
-import android.os.Build;
 import android.os.Bundle;
-import android.view.View;
-import android.view.WindowManager;
 
 import com.lody.virtual.client.core.VirtualCore;
 
-import io.virtualapp.R;
 import io.virtualapp.abs.ui.VActivity;
 import io.virtualapp.abs.ui.VUiKit;
 import io.virtualapp.home.NewHomeActivity;
@@ -16,20 +12,15 @@ public class SplashActivity extends VActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            getWindow().setStatusBarColor(getResources().getColor(R.color.colorPrimaryDark));
-            getWindow().setNavigationBarColor(getResources().getColor(R.color.colorPrimary));
-        }
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_splash);
+        // No setContentView needed — WelcomeTheme shows splash.xml as window background
 
         VUiKit.defer().when(() -> {
             long time = System.currentTimeMillis();
-            doActionInThread();
-            time = System.currentTimeMillis() - time;
-            long delta = 800L - time;
+            if (!VirtualCore.get().isEngineLaunched()) {
+                VirtualCore.get().waitForEngine();
+            }
+            long delta = 800L - (System.currentTimeMillis() - time);
             if (delta > 0) {
                 VUiKit.sleep(delta);
             }
@@ -38,11 +29,5 @@ public class SplashActivity extends VActivity {
             finish();
             overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
         });
-    }
-
-    private void doActionInThread() {
-        if (!VirtualCore.get().isEngineLaunched()) {
-            VirtualCore.get().waitForEngine();
-        }
     }
 }

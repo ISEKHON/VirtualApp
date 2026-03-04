@@ -1,11 +1,9 @@
 package io.virtualapp.home.repo;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 
 import com.lody.virtual.GmsSupport;
 import com.lody.virtual.client.core.InstallStrategy;
@@ -69,11 +67,6 @@ public class AppRepository implements AppDataSource {
             return false;
         }
         return true; // Pure system app without update
-    }
-
-    private static boolean hasLauncherIntent(Context context, String packageName) {
-        Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
-        return launchIntent != null;
     }
 
     @Override
@@ -200,11 +193,9 @@ public class AppRepository implements AppDataSource {
                 continue;
             }
 
-            // ignore the System package (but allow system apps that have launcher intent)
+            // Skip system apps
             if (isSystemApplication(pkg)) {
-                if (!hasLauncherIntent(context, pkg.packageName)) {
-                    continue;
-                }
+                continue;
             }
             ApplicationInfo ai = pkg.applicationInfo;
             String path = ai.publicSourceDir != null ? ai.publicSourceDir : ai.sourceDir;

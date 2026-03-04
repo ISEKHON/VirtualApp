@@ -1,6 +1,5 @@
 package io.virtualapp.settings;
 
-import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -10,8 +9,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
-import android.preference.PreferenceScreen;
+import android.preference.PreferenceCategory;
 import android.preference.SwitchPreference;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
 import android.widget.Toast;
 
 import com.lody.virtual.client.core.VirtualCore;
@@ -26,39 +27,44 @@ import io.virtualapp.VCommends;
 import io.virtualapp.gms.FakeGms;
 import io.virtualapp.home.ListAppActivity;
 
-/**
- * Settings activity for Launcher. Currently implements the following setting: Allow rotation
- */
-public class SettingsActivity extends Activity {
+public class SettingsActivity extends AppCompatActivity {
 
     private static final String ADVANCE_SETTINGS_KEY = "settings_advance";
     private static final String ADD_APP_KEY = "settings_add_app";
     private static final String MODULE_MANAGE_KEY = "settings_module_manage";
     private static final String APP_MANAGE_KEY = "settings_app_manage";
     private static final String TASK_MANAGE_KEY = "settings_task_manage";
-    private static final String DESKTOP_SETTINGS_KEY = "settings_desktop";
     private static final String REBOOT_KEY = "settings_reboot";
     private static final String HIDE_SETTINGS_KEY = "advance_settings_hide_settings";
     private static final String DISABLE_INSTALLER_KEY = "advance_settings_disable_installer";
-    public static final String ENABLE_LAUNCHER = "advance_settings_enable_launcher";
     private static final String INSTALL_GMS_KEY = "advance_settings_install_gms";
-    public static final String DIRECTLY_BACK_KEY = "advance_settings_directly_back";
     private static final String RECOMMEND_PLUGIN = "settings_plugin_recommend";
     private static final String DISABLE_RESIDENT_NOTIFICATION = "advance_settings_disable_resident_notification";
     private static final String ALLOW_FAKE_SIGNATURE = "advance_settings_allow_fake_signature";
     private static final String DISABLE_XPOSED = "advance_settings_disable_xposed";
-    private static final String FILE_MANAGE = "settings_file_manage";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_settings);
+
+        Toolbar toolbar = findViewById(R.id.settings_toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
 
         if (savedInstanceState == null) {
-            // Display the fragment as the main content.
             getFragmentManager().beginTransaction()
-                    .replace(android.R.id.content, new SettingsFragment())
+                    .replace(R.id.settings_container, new SettingsFragment())
                     .commit();
         }
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
     }
 
     /**
@@ -79,13 +85,9 @@ public class SettingsActivity extends Activity {
             Preference recommend = findPreference(RECOMMEND_PLUGIN);
             Preference appManage = findPreference(APP_MANAGE_KEY);
             Preference taskManage = findPreference(TASK_MANAGE_KEY);
-            Preference desktop = findPreference(DESKTOP_SETTINGS_KEY);
             Preference reboot = findPreference(REBOOT_KEY);
-            Preference fileMange = findPreference(FILE_MANAGE);
-
 
             SwitchPreference disableInstaller = (SwitchPreference) findPreference(DISABLE_INSTALLER_KEY);
-            SwitchPreference enableLauncher = (SwitchPreference) findPreference(ENABLE_LAUNCHER);
             SwitchPreference disableResidentNotification = (SwitchPreference) findPreference(DISABLE_RESIDENT_NOTIFICATION);
             SwitchPreference allowFakeSignature = (SwitchPreference) findPreference(ALLOW_FAKE_SIGNATURE);
             SwitchPreference disableXposed = (SwitchPreference) findPreference(DISABLE_XPOSED);
@@ -174,22 +176,6 @@ public class SettingsActivity extends Activity {
                 }
             });
 
-            enableLauncher.setOnPreferenceChangeListener((preference, newValue) -> {
-                if (!(newValue instanceof Boolean)) {
-                    return false;
-                }
-                try {
-                    boolean enable = (boolean) newValue;
-                    PackageManager packageManager = getActivity().getPackageManager();
-                    packageManager.setComponentEnabledSetting(new ComponentName(getActivity().getPackageName(), "vxp.launcher"),
-                            enable ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                            PackageManager.DONT_KILL_APP);
-                    return true;
-                } catch (Throwable ignored) {
-                    return false;
-                }
-            });
-
             Preference installGms = findPreference(INSTALL_GMS_KEY);
             installGms.setOnPreferenceClickListener(preference -> {
                 boolean alreadyInstalled = FakeGms.isAlreadyInstalled(getActivity());
@@ -199,12 +185,6 @@ public class SettingsActivity extends Activity {
                     FakeGms.installGms(getActivity());
                 }
                 return true;
-            });
-
-            fileMange.setOnPreferenceClickListener(preference -> {
-                OnlinePlugin.openOrDownload(getActivity(), OnlinePlugin.FILE_MANAGE_PACKAGE,
-                        OnlinePlugin.FILE_MANAGE_URL, getString(R.string.install_file_manager_tips));
-                return false;
             });
 
             disableXposed.setOnPreferenceChangeListener((preference, newValue) -> {
@@ -253,7 +233,7 @@ public class SettingsActivity extends Activity {
 
             if (android.os.Build.VERSION.SDK_INT < 25) {
                 // Android NR1 below do not need this.
-                PreferenceScreen advance = (PreferenceScreen) findPreference(ADVANCE_SETTINGS_KEY);
+                PreferenceCategory advance = (PreferenceCategory) findPreference(ADVANCE_SETTINGS_KEY);
                 advance.removePreference(disableResidentNotification);
             }
 
