@@ -25,7 +25,6 @@ import io.virtualapp.R;
 import io.virtualapp.VCommends;
 import io.virtualapp.gms.FakeGms;
 import io.virtualapp.home.ListAppActivity;
-import io.virtualapp.utils.Misc;
 
 /**
  * Settings activity for Launcher. Currently implements the following setting: Allow rotation
@@ -38,22 +37,17 @@ public class SettingsActivity extends Activity {
     private static final String APP_MANAGE_KEY = "settings_app_manage";
     private static final String TASK_MANAGE_KEY = "settings_task_manage";
     private static final String DESKTOP_SETTINGS_KEY = "settings_desktop";
-    private static final String FAQ_SETTINGS_KEY = "settings_faq";
-    private static final String DONATE_KEY = "settings_donate";
-    private static final String ABOUT_KEY = "settings_about";
     private static final String REBOOT_KEY = "settings_reboot";
     private static final String HIDE_SETTINGS_KEY = "advance_settings_hide_settings";
     private static final String DISABLE_INSTALLER_KEY = "advance_settings_disable_installer";
     public static final String ENABLE_LAUNCHER = "advance_settings_enable_launcher";
     private static final String INSTALL_GMS_KEY = "advance_settings_install_gms";
-    private static final String INSTALL_VIA_TAICHI_KEY = "advance_settings_install_via_taichi";
     public static final String DIRECTLY_BACK_KEY = "advance_settings_directly_back";
     private static final String RECOMMEND_PLUGIN = "settings_plugin_recommend";
     private static final String DISABLE_RESIDENT_NOTIFICATION = "advance_settings_disable_resident_notification";
     private static final String ALLOW_FAKE_SIGNATURE = "advance_settings_allow_fake_signature";
     private static final String DISABLE_XPOSED = "advance_settings_disable_xposed";
     private static final String FILE_MANAGE = "settings_file_manage";
-    private static final String PERMISSION_MANAGE = "settings_permission_manage";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,12 +80,8 @@ public class SettingsActivity extends Activity {
             Preference appManage = findPreference(APP_MANAGE_KEY);
             Preference taskManage = findPreference(TASK_MANAGE_KEY);
             Preference desktop = findPreference(DESKTOP_SETTINGS_KEY);
-            Preference faq = findPreference(FAQ_SETTINGS_KEY);
-            Preference donate = findPreference(DONATE_KEY);
-            Preference about = findPreference(ABOUT_KEY);
             Preference reboot = findPreference(REBOOT_KEY);
             Preference fileMange = findPreference(FILE_MANAGE);
-            Preference permissionManage = findPreference(PERMISSION_MANAGE);
 
 
             SwitchPreference disableInstaller = (SwitchPreference) findPreference(DISABLE_INSTALLER_KEY);
@@ -148,23 +138,6 @@ public class SettingsActivity extends Activity {
 
             taskManage.setOnPreferenceClickListener(preference -> {
                 startActivity(new Intent(getActivity(), TaskManageActivity.class));
-                return false;
-            });
-
-            faq.setOnPreferenceClickListener(preference -> {
-                Uri uri = Uri.parse("https://github.com/android-hacker/VAExposed/wiki/FAQ");
-                Intent t = new Intent(Intent.ACTION_VIEW, uri);
-                startActivity(t);
-                return false;
-            });
-
-
-            donate.setOnPreferenceClickListener(preference -> {
-                Misc.showDonate(getActivity());
-                return false;
-            });
-            about.setOnPreferenceClickListener(preference -> {
-                startActivity(new Intent(getActivity(), AboutActivity.class));
                 return false;
             });
 
@@ -228,41 +201,9 @@ public class SettingsActivity extends Activity {
                 return true;
             });
 
-            Preference installViaTaichi = findPreference(INSTALL_VIA_TAICHI_KEY);
-            installViaTaichi.setOnPreferenceClickListener(preference -> {
-                PackageManager pm = getActivity().getPackageManager();
-                try {
-                    pm.getPackageInfo("me.weishu.exp", 0);
-                    Intent intent = new Intent();
-                    intent.setComponent(new ComponentName("me.weishu.exp", "me.weishu.exp.ui.MainActivity"));
-                    startActivity(intent);
-                } catch (PackageManager.NameNotFoundException e) {
-                    android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(getActivity())
-                            .setTitle(android.R.string.dialog_alert_title)
-                            .setMessage(R.string.install_taichi_not_exist)
-                            .setPositiveButton(R.string.install_go_to_install_exp, (d, w) -> {
-                                Intent t = new Intent(Intent.ACTION_VIEW);
-                                t.setData(Uri.parse("https://taichi.cool"));
-                                startActivity(t);
-                            })
-                            .setNegativeButton(android.R.string.cancel, null)
-                            .create();
-                    dialog.show();
-                } catch (Throwable e) {
-                    Toast.makeText(getActivity(), "Failed to open TaiChi", Toast.LENGTH_SHORT).show();
-                }
-                return true;
-            });
-
             fileMange.setOnPreferenceClickListener(preference -> {
                 OnlinePlugin.openOrDownload(getActivity(), OnlinePlugin.FILE_MANAGE_PACKAGE,
                         OnlinePlugin.FILE_MANAGE_URL, getString(R.string.install_file_manager_tips));
-                return false;
-            });
-
-            permissionManage.setOnPreferenceClickListener(preference -> {
-                OnlinePlugin.openOrDownload(getActivity(), OnlinePlugin.PERMISSION_MANAGE_PACKAGE,
-                        OnlinePlugin.PERMISSION_MANAGE_URL, getString(R.string.install_permission_manager_tips));
                 return false;
             });
 
