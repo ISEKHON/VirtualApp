@@ -222,10 +222,6 @@ public class Installd {
             return null;
         }
 
-        if (TextUtils.equals(VirtualCore.TAICHI_PACKAGE, pkgInfo.packageName)) {
-            return null;
-        }
-
         if (VirtualCore.get().getHostPkg().equals(pkgInfo.packageName)) {
             Toast.makeText(VirtualCore.get().getContext(), R.string.install_self_eggs, Toast.LENGTH_SHORT).show();
             return null;

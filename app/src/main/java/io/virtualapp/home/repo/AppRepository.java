@@ -188,11 +188,6 @@ public class AppRepository implements AppDataSource {
                 continue;
             }
 
-            // ignore taichi package
-            if (VirtualCore.TAICHI_PACKAGE.equals(pkg.packageName)) {
-                continue;
-            }
-
             // Skip system apps
             if (isSystemApplication(pkg)) {
                 continue;

@@ -168,25 +168,10 @@
     <string name="install_file_manager_tips">File Manager is supported by Amaze File Manager, download(about 3M) and install it now?</string>
     <string name="settings_permission_manage_text">Permission Manager</string>
     <string name="install_permission_manager_tips">Permission Manager is implemented by XPrivacyLua, download(about 1.7M) and install it now?</string>
-    <string name="exp_tips">A long time ago, I revealed the information about EXposed. After a period of feedback and adjustment, EXposed has reached a milestone. Many users may don\'t know it, let me introduce you today. \n\n
 
-Like the VirtualApp I created earlier, EXposed is also an app that makes you use Xposed module without root, unlock the bootloader. they both have their own advantages, and EXposed will be much better in terms of performance and stability due to running directly in the native system; while VirtualApp is based on VitualApp, which is like Parallel Space. EXposed was born a month, and its stability has surpassed VirtualApp which has been developed for nearly a year. \n\n
-
-Currently, EXposed has been put on the app store and renamed to Tai Chi. You can try it out :)</string>
     <string name="advance_settings_enable_launcher_summary">When enabled, You can set VirtualApp be the Launcher of system</string>
     <string name="advance_settings_enable_launcher">Enable Launcher</string>
-    <string name="advance_settings_taichi_title">Install via TaiChi</string>
-    <string name="advance_settings_taichi_summary">Open TaiChi app to install Xposed modules through TaiChi instead of VirtualApp</string>
-    <string name="exp_introduce_title">An easy way to use Xposed</string>
-    <string name="exp_introduce_install">Have a try</string>
-    <string name="what_is_exp">What\'s TaiChi?</string>
-    <string name="install_choose_way">Choose way to install</string>
-    <string name="install_choose_content" >You can use Xposed modules through TaiChi except VirtualApp. VirtualApp supports Virtual-App，while TaiChi is much more stable.</string>
-    <string name="install_choose_taichi">TaiChi</string>
-    <string name="install_taichi_not_exist">TaiChi is not installed!</string>
-    <string name="install_go_to_install_exp">Go to install TaiChi</string>
-    <string name="install_taichi_while_old_version">The version of TaiChi installed is too old, Please install the latest Taichi!</string>
-    <string name="install_go_latest_exp">Install the latest TaiChi</string>
+
     <string name="install_complete_and_open">Open</string>
     <string name="unsupported_for_32bit_app">32bits App is not supported!</string>
 </resources>

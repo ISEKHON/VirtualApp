@@ -69,8 +69,6 @@ public final class VirtualCore {
 
     public static final int GET_HIDDEN_APP = 0x00000001;
 
-    public static final String TAICHI_PACKAGE = "me.weishu.exp";
-
     @SuppressLint("StaticFieldLeak")
     private static VirtualCore gCore = new VirtualCore();
     private final int myUid = Process.myUid();
