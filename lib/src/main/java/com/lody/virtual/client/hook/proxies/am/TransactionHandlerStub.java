@@ -22,8 +22,33 @@ public class TransactionHandlerStub implements IInjector {
         Log.i(TAG, "inject transaction handler.");
         Object activityThread = ActivityThread.currentActivityThread.call();
         Object transactionExecutor = ActivityThread.mTransactionExecutor.get(activityThread);
+        if (transactionExecutor == null) {
+            Log.e(TAG, "mTransactionExecutor is null on API " + android.os.Build.VERSION.SDK_INT
+                    + " — activity interception will not work!");
+            return;
+        }
 
-        Field mTransactionHandlerField = transactionExecutor.getClass().getDeclaredField("mTransactionHandler");
+        // Try to find mTransactionHandler field (may be renamed on future API levels)
+        Field mTransactionHandlerField = null;
+        try {
+            mTransactionHandlerField = transactionExecutor.getClass().getDeclaredField("mTransactionHandler");
+        } catch (NoSuchFieldException e) {
+            // Android 16+ may rename this field — try alternatives
+            for (Field f : transactionExecutor.getClass().getDeclaredFields()) {
+                if (ClientTransactionHandler.class.isAssignableFrom(f.getType())) {
+                    mTransactionHandlerField = f;
+                    Log.w(TAG, "Using alternative field: " + f.getName() + " for transaction handler");
+                    break;
+                }
+            }
+        }
+
+        if (mTransactionHandlerField == null) {
+            Log.e(TAG, "Cannot find transaction handler field in " + transactionExecutor.getClass().getName()
+                    + " on API " + android.os.Build.VERSION.SDK_INT);
+            return;
+        }
+
         mTransactionHandlerField.setAccessible(true);
         ClientTransactionHandler original = (ClientTransactionHandler) mTransactionHandlerField.get(transactionExecutor);
         TransactionHandlerProxy proxy = new TransactionHandlerProxy(original);
