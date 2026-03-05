@@ -405,6 +405,12 @@ public class TransactionHandlerProxy extends ClientTransactionHandler {
         originalHandler.reportRelaunch(token, pendingActions);
     }
 
+    // Android 15
+    @Override
+    public void reportRelaunch(ActivityClientRecord r) {
+        originalHandler.reportRelaunch(r);
+    }
+
     @Override
     public Map getActivitiesToBeDestroyed() {
         return originalHandler.getActivitiesToBeDestroyed();

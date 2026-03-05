@@ -48,7 +48,8 @@ public class JobServiceStub extends BinderInvocationProxy {
 		private getPendingJob() {
 		}
 		public Object call(Object who, Method method, Object... args) throws Throwable {
-			return VJobScheduler.get().getPendingJob((Integer) args[0]);
+			if (args[0] == null) return null;
+			return VJobScheduler.get().getPendingJob(((Number) args[0]).intValue());
 		}
 		public String getMethodName() {
 			return "getPendingJob";
@@ -131,7 +132,8 @@ public class JobServiceStub extends BinderInvocationProxy {
 
 		@Override
 		public Object call(Object who, Method method, Object... args) throws Throwable {
-			int jobId = (int) args[0];
+			if (args[0] == null) return 0;
+			int jobId = ((Number) args[0]).intValue();
 			VJobScheduler.get().cancel(jobId);
 			return 0;
 		}

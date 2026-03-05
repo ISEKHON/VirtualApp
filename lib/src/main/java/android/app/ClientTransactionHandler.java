@@ -296,6 +296,9 @@ public abstract class ClientTransactionHandler {
      * */
     public abstract void reportRelaunch(IBinder token, PendingTransactionActions pendingActions);
 
+    // Android 15
+    public abstract void reportRelaunch(ActivityThread.ActivityClientRecord r);
+
     public abstract Map getActivitiesToBeDestroyed();
 
     // Android 10
