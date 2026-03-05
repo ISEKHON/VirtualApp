@@ -138,15 +138,31 @@ public class BroadcastSystem {
             String componentAction = String.format("_VA_%s_%s", info.packageName, info.name);
             IntentFilter componentFilter = new IntentFilter(componentAction);
             BroadcastReceiver r = new StaticBroadcastReceiver(setting.appId, info, componentFilter);
-            mContext.registerReceiver(r, componentFilter, null, mScheduler);
+            registerReceiverCompat(r, componentFilter);
             receivers.add(r);
             for (VPackage.ActivityIntentInfo ci : receiver.intents) {
                 IntentFilter cloneFilter = new IntentFilter(ci.filter);
                 SpecialComponentList.protectIntentFilter(cloneFilter);
                 r = new StaticBroadcastReceiver(setting.appId, info, cloneFilter);
-                mContext.registerReceiver(r, cloneFilter, null, mScheduler);
+                registerReceiverCompat(r, cloneFilter);
                 receivers.add(r);
             }
+        }
+    }
+
+    /**
+     * Register a receiver with proper export flags for Android 13+ (API 33+).
+     * On API 33+, dynamically registered receivers must specify RECEIVER_EXPORTED
+     * or RECEIVER_NOT_EXPORTED to avoid SecurityException.
+     */
+    private void registerReceiverCompat(BroadcastReceiver receiver, IntentFilter filter) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            // Context.RECEIVER_NOT_EXPORTED = 0x4 (added in API 33)
+            // These are internal VA receivers that only receive broadcasts we send ourselves
+            final int RECEIVER_NOT_EXPORTED = 0x4;
+            mContext.registerReceiver(receiver, filter, null, mScheduler, RECEIVER_NOT_EXPORTED);
+        } else {
+            mContext.registerReceiver(receiver, filter, null, mScheduler);
         }
     }
 

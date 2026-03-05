@@ -40,13 +40,18 @@ import io.virtualapp.home.LoadingActivity;
  *   uninstall <pkg>— Remove a cloned app and its data
  *   check   <pkg>  — Check if a package is cloned
  *   clear   <pkg>  — Clear data for a cloned app
+ *   gms            — Install Google Mobile Services from host device
+ *
+ * NOTE: On Android 14+ implicit broadcasts don't work. You MUST use explicit
+ * component targeting with -n flag:
+ *   adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd <command>
  *
  * Examples:
- *   adb shell am broadcast -a io.va.exposed64.CMD --es cmd clone --es pkg com.instagram.android
- *   adb shell am broadcast -a io.va.exposed64.CMD --es cmd run --es pkg com.twitter.android
- *   adb shell am broadcast -a io.va.exposed64.CMD --es cmd list
- *   adb shell am broadcast -a io.va.exposed64.CMD --es cmd kill --es pkg com.facebook.katana
- *   adb shell am broadcast -a io.va.exposed64.CMD --es cmd uninstall --es pkg com.cpuid.cpu_z
+ *   adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd clone --es pkg com.instagram.android
+ *   adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd run --es pkg com.twitter.android
+ *   adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd list
+ *   adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd kill --es pkg com.facebook.katana
+ *   adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd gms
  */
 public class CmdReceiver extends BroadcastReceiver {
 
@@ -108,6 +113,9 @@ public class CmdReceiver extends BroadcastReceiver {
                 break;
             case "clear":
                 cmdClear(context, pkg);
+                break;
+            case "gms":
+                cmdGms(context);
                 break;
             default:
                 report(context, "ERROR: Unknown command '" + cmd + "'");
@@ -275,6 +283,16 @@ public class CmdReceiver extends BroadcastReceiver {
         }
         boolean ok = VirtualCore.get().clearPackage(pkg);
         report(context, ok ? "CLEARED: " + pkg : "CLEAR_FAILED: " + pkg);
+    }
+
+    // ── gms ─────────────────────────────────────────────────────
+    private void cmdGms(Context context) {
+        try {
+            com.lody.virtual.GmsSupport.installGApps(0);
+            report(context, "GMS_INSTALLING: Google services are being installed from host device");
+        } catch (Exception e) {
+            report(context, "GMS_ERROR: " + e.getMessage());
+        }
     }
 
     // ── Helpers ────────────────────────────────────────────────

@@ -228,11 +228,13 @@
     <application>
         <service
             android:name="com.lody.virtual.client.stub.DaemonService"
+            android:exported="false"
             android:foregroundServiceType="dataSync"
             android:process="@string/engine_process_name" />
 
         <service
             android:name="com.lody.virtual.client.stub.DaemonService$InnerService"
+            android:exported="false"
             android:foregroundServiceType="dataSync"
             android:process="@string/engine_process_name" />
 
@@ -246,17 +248,21 @@
 
         <activity
             android:name=".client.stub.StubPendingActivity"
+            android:exported="false"
             android:process="@string/engine_process_name" />
 
         <service
             android:name=".client.stub.StubPendingService"
+            android:exported="false"
             android:process="@string/engine_process_name" />
         <receiver
             android:name=".client.stub.StubPendingReceiver"
+            android:exported="false"
             android:process="@string/engine_process_name" />
 
         <service
             android:name=".client.stub.StubJob"
+            android:exported="true"
             android:permission="android.permission.BIND_JOB_SERVICE"
             android:process="@string/engine_process_name" />
 

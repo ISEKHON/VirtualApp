@@ -1,6 +1,6 @@
-# Android 14 (API 34) Compatibility Fixes
+# Android 14-16 (API 34-36) Compatibility Fixes
 
-This document details every fix applied to make VirtualApp work on Android 14, organized by crash type and subsystem.
+This document details every fix applied to make VirtualApp work on Android 14-16, organized by crash type and subsystem.
 
 ---
 
@@ -260,3 +260,163 @@ On API 34+, `DexFile` internals changed. Instead of throwing `RuntimeException` 
 | Xposed | Crashed the process | Auto-disabled, optional via Settings |
 
 **Test device:** Xiaomi Redmi (sunstone), Snapdragon 695, Android 14 (API 34), MIUI OS 2.0.6.0
+
+---
+
+## 6. Android 11-16 Compatibility Fixes (Session 2)
+
+These fixes address issues discovered across Android 11 (API 30) through Android 16 (API 36).
+
+### 6.1 EditText/IME ANR — AutofillManager UID Mismatch
+
+**File:** `lib/src/main/java/com/lody/virtual/client/hook/proxies/view/AutoFillManagerStub.java`
+
+**Symptom:** Typing in any `EditText` in cloned apps (Twitter login, Facebook search, etc.) caused a 5-second freeze followed by ANR. The entire VirtualApp process became unresponsive.
+
+**Root Cause:** When a virtual app's `EditText` receives focus, Android's `AutofillManager` calls `startSession()` on the system `IAutoFillManager` service, passing the virtual app's `ComponentName` (e.g., `com.twitter.android/.LoginActivity`). The system_server validates that the calling UID owns that package — but the calling UID is VirtualApp's host UID (e.g., 10222), not Twitter's UID (e.g., 10215). This triggers a `SecurityException` **server-side**. The exception is caught server-side, but the `IResultReceiver` callback is **never signalled**. Client-side, `SyncResultReceiver.getIntResult(5_000)` blocks the main thread for 5 seconds waiting for a response that never comes, causing the ANR.
+
+The previous `ReplacePkgAndComponentProxy` approach (replacing the ComponentName's package with the host package) was insufficient because the system still validated the ActivityRecord association.
+
+**Fix:** Complete rewrite with `SafeAutofillSessionProxy`:
+
+1. **Does NOT call the real service** — overrides `call()` to prevent the binder RPC entirely
+2. **Finds the `IResultReceiver`** argument via reflection by scanning method parameters for an object with a `send(int, Bundle)` method
+3. **Sends `NO_SESSION`** (`Integer.MIN_VALUE`) to unblock the client immediately
+4. **Returns safe defaults** based on the method's return type (false for boolean, 0 for int, null for objects)
+5. **Fixed `inject()` method** — no longer returns early on mService replacement failure; still registers method proxies via the binder hook path
+
+```java
+// Key logic in SafeAutofillSessionProxy.call():
+for (Object arg : args) {
+    // Find IResultReceiver by looking for send(int, Bundle)
+    Method sendMethod = arg.getClass().getMethod("send", int.class, Bundle.class);
+    sendMethod.invoke(arg, Integer.MIN_VALUE, null); // NO_SESSION
+}
+```
+
+**Verification:** Twitter login form — tapped EditText, typed `test123` — returned immediately with no ANR. Logcat confirmed: `startSession: sent NO_SESSION to receiver for virtual app`.
+
+---
+
+### 6.2 VEnvironment Storage Directory Failure (Android 11+)
+
+**File:** `lib/src/main/java/com/lody/virtual/os/VEnvironment.java`
+
+**Symptom:** `Unable to create the directory: /storage/emulated/0/Android/data/io.va.exposed64/virtual/0` — logged as error on Android 11+, preventing virtual apps from accessing their storage.
+
+**Root Cause:** Android 11 (API 30) introduced scoped storage enforcement. Direct `File.mkdirs()` calls to paths under `/storage/emulated/0/Android/data/` fail because the app doesn't have the `MANAGE_EXTERNAL_STORAGE` permission and the MediaStore doesn't grant directory creation there.
+
+**Fix:** 3-tier fallback in `getVirtualPrivateStorageDir(int userId)`:
+
+1. **Tier 1:** Traditional path via direct `mkdirs()` (works on Android 10 and below)
+2. **Tier 2:** `VirtualCore.get().getContext().getExternalFilesDir(null)` → `.../files/virtual/<userId>` (always writable, no special permissions)
+3. **Tier 3:** `VirtualCore.get().getContext().getFilesDir()` → internal storage fallback
+4. **Final:** Returns original path with warning log if all tiers fail
+
+---
+
+### 6.3 Missing `android:exported` Attributes (Android 12+)
+
+**Files:**
+- `app/app-ext/src/main/AndroidManifest.xml`
+- `app-plugin/src/main/AndroidManifest.xml`
+- `lib/src/main/AndroidManifest.xml`
+
+**Symptom:** APK installation crash on Android 12+ (API 31) — `INSTALL_FAILED_VERIFICATION_FAILURE` because activities/services/receivers with intent-filters lacked explicit `android:exported` attribute.
+
+**Fix:**
+- `EmptyActivity` (app-ext, app-plugin): Added `android:exported="true"` (has intent-filters for launcher)
+- `DaemonService`, `DaemonService$InnerService`: Added `android:exported="false"` (internal only)
+- `StubPendingActivity`, `StubPendingService`, `StubPendingReceiver`: Added `android:exported="false"`
+- `StubJob`: Added `android:exported="true"` (must be visible to system `JobScheduler`)
+
+---
+
+### 6.4 Background Service Start Restrictions (Android 8+/12+)
+
+**File:** `lib/src/main/java/com/lody/virtual/client/stub/DaemonService.java`
+
+**Symptom:** `IllegalStateException: Not allowed to start service Intent {...}: app is in background` on Android 12+ when `DaemonService.startup()` called `context.startService()` from background.
+
+**Fix:**
+- `startup()`: Uses `context.startForegroundService()` on API 26+ with try-catch fallback
+- `onCreate()`: Uses `startForegroundService()` for `InnerService` on API 26+
+
+---
+
+### 6.5 Broadcast Receiver Export Flag (Android 14+)
+
+**File:** `lib/src/main/java/com/lody/virtual/server/am/BroadcastSystem.java`
+
+**Symptom:** `SecurityException: One of RECEIVER_EXPORTED or RECEIVER_NOT_EXPORTED should be specified` when calling `registerReceiver()` on Android 14+ (API 34).
+
+**Fix:** Added `registerReceiverCompat()` helper method that passes raw `RECEIVER_NOT_EXPORTED` flag (int `0x4`) on API 33+. Uses raw constant because `lib/` targets compileSdk 30 where `Context.RECEIVER_NOT_EXPORTED` doesn't exist.
+
+---
+
+### 6.6 Missing Foreground Service Type Permissions (Android 14+)
+
+**File:** `app/src/main/AndroidManifest.xml`
+
+**Symptom:** `SecurityException: Starting FGS with type ... requires permission` on Android 14+ when virtual apps start foreground services.
+
+**Fix:** Added 7 foreground service type permissions:
+- `FOREGROUND_SERVICE_CAMERA`, `FOREGROUND_SERVICE_LOCATION`, `FOREGROUND_SERVICE_MICROPHONE`
+- `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `FOREGROUND_SERVICE_PHONE_CALL`
+- `FOREGROUND_SERVICE_CONNECTED_DEVICE`, `FOREGROUND_SERVICE_MEDIA_PROJECTION`
+- Also added `POST_NOTIFICATIONS` for Android 13+
+
+---
+
+### 6.7 BuildCompat Version Helpers
+
+**File:** `lib/src/main/java/com/lody/virtual/helper/compat/BuildCompat.java`
+
+Added version check helpers: `isSv2()` (32), `isT()` (33), `isU()` (34), `isV()` (35), `isW()` (36).
+
+---
+
+### 6.8 32-bit ABI Mismatch Fix
+
+**Files:**
+- `lib/src/main/jni/Application.mk`
+- `app/build.gradle`
+- `lib/build.gradle`
+
+**Symptom:** 32-bit APK split contained no `libva++.so` because `Application.mk` built `x86_64 arm64-v8a` while Gradle expected `arm64-v8a armeabi-v7a`.
+
+**Fix:**
+- `Application.mk`: Changed to `arm64-v8a armeabi-v7a x86_64`; updated `APP_PLATFORM` from `android-14` to `android-21`
+- `app/build.gradle` and `lib/build.gradle`: Updated abiFilters to include all three ABIs; app splits updated
+
+---
+
+### 6.9 Android 15/16 Transaction Handler Compatibility
+
+**Files (prior session):**
+- `lib/src/main/java/com/lody/virtual/client/hook/proxies/am/HCallbackStub.java`
+- `SceneTransitionInfo.java` (AOSP stub)
+
+Android 15 renamed `ActivityOptions` to `SceneTransitionInfo` in `ClientTransaction` items. Added AOSP stub class and updated `HCallbackStub` to handle both old and new class names.
+
+---
+
+## Testing Results (Updated)
+
+| Test | Before | After |
+|------|--------|-------|
+| App startup | Crashes | Clean startup, all packages loaded |
+| Cloned app list | Apps disappeared on restart | Persistent across restarts |
+| Launch MT Manager | SIGILL → SIGSEGV → AbstractMethodError | Launches successfully |
+| Launch CPU-Z | Same crash chain | Launches successfully |
+| **EditText typing (Twitter)** | **5s ANR → process unresponsive** | **Instant response, text entered** |
+| **EditText typing (password)** | **ANR** | **Working** |
+| **Storage directory creation** | **Failed on Android 11+** | **3-tier fallback working** |
+| Native IO redirect | Disabled (API 34 guard) | Enabled, working |
+| Xposed | Crashed the process | Auto-disabled, optional via Settings |
+| **APK install on Android 12+** | **Blocked (missing exported)** | **Installs cleanly** |
+| **32-bit APK split** | **Missing libva++.so** | **All 3 ABIs present** |
+
+**Test environments:**
+- Android 15 x86_64 emulator (API 35) — primary
+- Xiaomi Redmi (sunstone), Snapdragon 695, Android 14 (API 34), MIUI OS 2.0.6.0

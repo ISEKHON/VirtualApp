@@ -21,7 +21,8 @@
 <!--            </intent-filter>-->
 <!--        </activity-alias>-->
 
-        <activity android:name="com.lody.virtual.EmptyActivity">
+        <activity android:name="com.lody.virtual.EmptyActivity"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <action android:name="android.intent.action.LAUNCH_HELPER" />

@@ -4,7 +4,54 @@ All notable changes to VirtualApp are documented in this file.
 
 ---
 
-## [Unreleased] — Android 14 (API 34) Compatibility Port
+## [Unreleased] — Android 11-16 (API 30-36) Comprehensive Compatibility
+
+### Summary
+
+Major compatibility overhaul addressing Android 11 through 16. Fixes critical crashes (EditText/IME ANR, directory creation failure), adds comprehensive Android 12-16 manifest attributes, foreground service compliance, broadcast receiver safety, and improved GMS/32-bit support.
+
+### Added
+
+- **Android 16 `ClientTransactionHandler` support** — Reflection-based delegation for `handleLaunchActivity`, `handleResumeActivity`, `handlePauseActivity`, `handleStartActivity`, `handleStopActivity`, `handleDestroyActivity` with Android 16's new parameter signatures
+- **Android 16 `HCallbackStub` EXECUTE_TRANSACTION** — Handles both `getCallbacks()` (pre-16) and `getTransactionItems()` (Android 16) for `ClientTransaction` processing
+- **Android 16 `HiddenApiBypass`** — 3-tier approach with LSPosed `hiddenapibypass:6.1` (Unsafe), meta-reflection, and VMRuntime fallback with caching
+- **`BuildCompat` version helpers** — Added `isSv2()` (API 32), `isT()` (API 33), `isU()` (API 34), `isV()` (API 35), `isW()` (API 36) for version-gated compatibility checks
+- **`POST_NOTIFICATIONS` permission** — Required for Android 13+ notification runtime permission
+- **Foreground service type permissions** — `FOREGROUND_SERVICE_CAMERA`, `FOREGROUND_SERVICE_LOCATION`, `FOREGROUND_SERVICE_MICROPHONE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `FOREGROUND_SERVICE_PHONE_CALL`, `FOREGROUND_SERVICE_CONNECTED_DEVICE`, `FOREGROUND_SERVICE_MEDIA_PROJECTION` for Android 14+ per-type requirements
+- **`CmdReceiver` `gms` command** — Install Google Mobile Services from host device via ADB: `am broadcast -n ... --es cmd gms`
+- **x86_64 ABI support** — Native libraries now built for `arm64-v8a`, `armeabi-v7a`, and `x86_64` (emulator support)
+
+### Changed
+
+- **`AutoFillManagerStub`** — Complete rewrite using `SafeAutofillSessionProxy`:
+  - Intercepts `startSession`/`updateOrRestartSession` without calling through to system_server
+  - Finds `IResultReceiver` argument and signals `NO_SESSION` (Integer.MIN_VALUE) to prevent 5-second `SyncResultReceiver` timeout
+  - Returns safe default values for different method return types
+  - **Root cause:** System_server rejects autofill sessions because host UID doesn't match virtual app's `ComponentName` → `SecurityException` → `IResultReceiver` never called → `SyncResultReceiver.getIntResult()` blocks main thread 5 seconds → ANR
+- **`VEnvironment.getVirtualPrivateStorageDir()`** — 3-tier fallback for scoped storage:
+  1. Traditional path: `/storage/emulated/0/Android/data/<host>/virtual/<userId>` 
+  2. Fallback: `getExternalFilesDir(null)` → `/storage/emulated/0/Android/data/<host>/files/virtual/<userId>`
+  3. Last resort: `getFilesDir()` → internal storage
+- **`DaemonService.startup()`** — Uses `startForegroundService()` on Android 8+ (was `startService()` which fails on Android 12+ background start restrictions)
+- **`BroadcastSystem.registerReceiverCompat()`** — Uses `RECEIVER_NOT_EXPORTED` flag (0x4) on Android 13+ to prevent `SecurityException` from unspecified receiver export flags
+- **`Application.mk`** — APP_PLATFORM updated from `android-14` to `android-21` matching minSdkVersion; builds all three ABIs
+- **`CmdReceiver` docs** — Updated with explicit component targeting requirement for Android 14+, added `gms` command
+
+### Fixed
+
+- **EditText/IME crash (ANR)** — Twitter, Facebook, and other apps no longer freeze when typing in text fields. Fixed the AutofillManager UID mismatch that caused a 5-second main-thread timeout.
+- **`Unable to create the directory` error** — `VEnvironment.getVirtualPrivateStorageDir()` now gracefully falls back when scoped storage prevents `mkdirs()` under `/storage/emulated/0/Android/data/`
+- **`android:exported` missing** — Added explicit `exported` attributes to:
+  - `EmptyActivity` in app-ext and app-plugin manifests (`exported="true"` — has intent-filters)
+  - `DaemonService`, `DaemonService$InnerService` (`exported="false"`)
+  - `StubPendingActivity`, `StubPendingService`, `StubPendingReceiver` (`exported="false"`)
+  - `StubJob` (`exported="true"` — needed for system JobScheduler)
+- **Background service crash on Android 12+** — `DaemonService` now uses `startForegroundService()` instead of `startService()` from background
+- **`SecurityException` on receiver registration** — `BroadcastSystem` now specifies `RECEIVER_NOT_EXPORTED` on API 33+
+
+---
+
+## [Previous] — Android 14 (API 34) Compatibility Port
 
 ### Summary
 

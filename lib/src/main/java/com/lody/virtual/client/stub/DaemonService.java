@@ -32,7 +32,16 @@ public class DaemonService extends Service {
 			showNotification = false;
 		}
 
-		context.startService(new Intent(context, DaemonService.class));
+		try {
+			Intent serviceIntent = new Intent(context, DaemonService.class);
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+				context.startForegroundService(serviceIntent);
+			} else {
+				context.startService(serviceIntent);
+			}
+		} catch (Exception e) {
+			Log.w("DaemonService", "startup failed: " + e.getMessage());
+		}
 		if (VirtualCore.get().isServerProcess()) {
 			// PrivilegeAppOptimizer.notifyBootFinish();
 			DaemonJobService.scheduleJob(context);
@@ -75,7 +84,12 @@ public class DaemonService extends Service {
 			return;
 		}
 		try {
-			startService(new Intent(this, InnerService.class));
+			Intent innerIntent = new Intent(this, InnerService.class);
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+				startForegroundService(innerIntent);
+			} else {
+				startService(innerIntent);
+			}
 			startForeground(NOTIFY_ID, buildNotification(this));
 		} catch (Exception e) {
 			Log.w("DaemonService", "startForeground failed: " + e.getMessage());

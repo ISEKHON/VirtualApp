@@ -1,6 +1,6 @@
 # Known Issues & Limitations
 
-This document lists known issues, limitations, and potential problems with the current Android 14 (API 34) port of VirtualApp.
+This document lists known issues, limitations, and potential problems with the Android 11-16 (API 30-36) port of VirtualApp.
 
 ---
 
@@ -20,15 +20,29 @@ Epic and SandHook, the runtime engines for Xposed support, rely on inline-hookin
 
 ---
 
-### 2. IPCThreadState Symbols Not Resolved
+### 2. Hidden API Bypass May Fail on Android 15-16
 
-**Status:** Known, mitigated (falls back to getuid)
+**Status:** Known, partially mitigated (3-tier bypass)
 
-On some Android 14 builds (including tested Xiaomi MIUI), `dlsym(RTLD_DEFAULT, "_ZN7android14IPCThreadState4selfEv")` returns null. This means the IPCThreadState fallback in `getCallingUid_hook` is unavailable.
+Google is progressively adding `VMRuntime.setHiddenApiExemptions` to the blocklist. The current 3-tier bypass (LSPosed Unsafe, meta-reflection, VMRuntime) may stop working on future Android releases.
 
-**Impact:** When ArtMethod pointer swap works (which it does on our test device), this is not an issue. If the swap ever fails, the third fallback (`getuid()`) returns the host app's UID rather than the real calling UID, which may cause permission issues for some operations.
+**Impact:** If all three bypass tiers fail, all mirror class initialization fails → cascade crash. This would break VirtualApp entirely.
 
-**Diagnostic:** Check `logcat` for: `hookAndroidVM: IPCThreadState_self=0x0, native_getCallingUid=0x0`
+**Workaround:** On rooted devices, use Magisk modules that set hidden API enforcement policy to 0.
+
+**Diagnostic:** Check `logcat` for: `HiddenApiBypass: All bypass attempts failed`
+
+---
+
+### 3. Background Activity Launch Restrictions (Android 14+)
+
+**Status:** Known, partially mitigated
+
+Android 14+ increasingly restricts launching activities from the background. VirtualApp's `ActivityStack.startActivityInNewTaskLocked()` may be blocked by the system when the host app is in the background.
+
+**Impact:** Some app launches may fail silently if VirtualApp's host process isn't in the foreground.
+
+**Workaround:** Keep VirtualApp's UI visible when launching apps, or use ADB commands.
 
 ---
 
@@ -61,39 +75,35 @@ Cloned apps run under the host app's SELinux context (`untrusted_app_30`), not t
 
 ---
 
-### 5. Storage Path Limitations
-
-**Status:** Known, partial fix
-
-`VEnvironment` warns `Unable to create the directory: /storage/emulated/0/VirtualApp/vsdcard` on Android 14 due to scoped storage restrictions.
-
-**Impact:** Apps relying on external storage in the virtual SD card path may not have write access. Internal storage works fine.
-
-**Workaround:** Grant `MANAGE_EXTERNAL_STORAGE` permission to the host app or use apps that work with internal storage.
-
----
-
-### 6. BinderInvocationStub Build Failures
+### 5. BinderInvocationStub Build Failures
 
 **Status:** Known, non-fatal
 
-Three `MethodInvocationStub` stubs fail to build with `Unable to build HookDelegate: BinderInvocationStub`. These appear early during virtual process initialization.
+Some `MethodInvocationStub` stubs fail to build with `Unable to build HookDelegate: BinderInvocationStub`. These appear early during virtual process initialization.
 
 **Impact:** Some Binder service hooks may be missing. Most critical services still work.
 
-**Diagnostic:** Check `logcat` for: `MethodInvocationStub: Unable to build HookDelegate: BinderInvocationStub`
+---
+
+### 6. Dynamic Code Loading Restrictions (Android 14+)
+
+**Status:** Known, partial mitigation
+
+Android 14+ restricts execution of DEX files from writable paths. `ArtDexOptimizer.compileDex2Oat()` runs `dex2oat` directly which may be blocked by SELinux. The `DexFile` class is deprecated and may be removed.
+
+**Impact:** First-time DEX optimization may fail. VirtualApp has fallback paths but performance may be degraded.
 
 ---
 
 ## Minor
 
-### 7. AutoFillManager Injection Error (MIUI)
+### 7. AutoFillManager Injection Warning (MIUI)
 
 **Status:** Vendor-specific, non-fatal
 
-`AutoFillManagerStub: AutoFillManagerStub inject error` appears on Xiaomi/MIUI devices. MIUI's custom AutoFillManager class structure differs from AOSP.
+`AutoFillManagerStub inject error` may appear on MIUI/custom ROM devices where AutoFillManager class structure differs. The `SafeAutofillSessionProxy` still intercepts autofill via the binder hook path even when mService replacement fails.
 
-**Impact:** Autofill in cloned apps may not work on MIUI devices. No crash.
+**Impact:** No crash. Autofill sessions return NO_SESSION cleanly.
 
 ---
 
@@ -101,12 +111,7 @@ Three `MethodInvocationStub` stubs fail to build with `Unable to build HookDeleg
 
 **Status:** Known, expected
 
-First launch of a cloned app takes 2-4 seconds longer than subsequent launches due to:
-- APK re-parsing if cache was invalid
-- DEX optimization (dex2oat) on first run
-- Native hook installation
-
-**Impact:** User-visible delay on first launch only. Subsequent launches are faster.
+First launch of a cloned app takes 2-4 seconds longer than subsequent launches due to DEX optimization and native hook installation.
 
 ---
 
@@ -114,9 +119,7 @@ First launch of a cloned app takes 2-4 seconds longer than subsequent launches d
 
 **Status:** Known, cosmetic warning
 
-The project compiles against SDK 34 (Android 14) but uses AGP 7.4.2 which was tested up to compileSdk 33. A warning is shown during build but everything works correctly.
-
-**Impact:** A non-fatal warning during build. No functional impact.
+Build warning about compileSdk 34 vs AGP 7.4.2 (tested up to 33). No functional impact.
 
 **Future fix:** Upgrade AGP to 8.x when Gradle wrapper is updated.
 
@@ -126,29 +129,97 @@ The project compiles against SDK 34 (Android 14) but uses AGP 7.4.2 which was te
 
 **Status:** Builds successfully, untested
 
-The native code builds for both `arm64-v8a` and `armeabi-v7a`. 32-bit syscall numbers (`__NR_fstatat64`) are conditionally compiled. All primary testing has been on ARM64.
+Native code builds for `arm64-v8a`, `armeabi-v7a`, and `x86_64`. 32-bit syscall numbers are conditionally compiled. 32-bit hooking uses Cydia Substrate (Arm64 uses And64InlineHook). Primary testing is on x86_64 emulator and ARM64.
 
-**Impact:** 32-bit ARM devices may work but are unverified. The And64InlineHook engine is ARM64-only; 32-bit hooking uses Cydia Substrate.
+---
+
+### 11. GMS (Google Play Services) Limitations
+
+**Status:** Known, partial support
+
+GMS support copies Google packages from the host device. The following limitations exist:
+- **Push notifications (GCM/FCM):** Registration token relay between virtual and real GMS not implemented
+- **Google Maps:** No Maps service proxy; apps using Google Maps may show blank
+- **SafetyNet/Play Integrity:** No attestation bypass; apps checking device integrity will fail
+- **FakeGms download URL:** The microG auto-download URL (`vaexposed.weishu.me`) is defunct; use host device GMS or install microG manually
+
+**Workaround:** Install GMS from the host device via Settings → "Install Google Services" or ADB: `am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd gms`
+
+---
+
+## Resolved Issues
+
+### ~~EditText/IME Crash (ANR)~~
+
+**Status:** FIXED
+
+Apps like Twitter and Facebook would freeze (ANR) when typing in EditText fields. Root cause: AutofillManager's `startSession` passed the virtual app's `ComponentName` to system_server, which rejected it due to UID mismatch. The `IResultReceiver` was never signalled, causing `SyncResultReceiver` to block the main thread for 5 seconds.
+
+**Fix:** `SafeAutofillSessionProxy` intercepts the call, signals the `IResultReceiver` with `NO_SESSION` immediately, preventing any timeout.
+
+### ~~Storage Directory Creation Failure~~
+
+**Status:** FIXED
+
+`Unable to create the directory: /storage/emulated/0/Android/data/io.va.exposed64/virtual/0` on Android 11+.
+
+**Fix:** `getVirtualPrivateStorageDir()` now has 3-tier fallback: direct path → `getExternalFilesDir()` → internal storage.
 
 ---
 
 ## Device-Specific Notes
 
+### Android 15 x86_64 Emulator (API 35)
+
+Primary test environment. All 5 test apps (ZArchiver, Instagram, MT Manager, X/Twitter, Facebook) verified working:
+- App cloning, launching, EditText interaction all functional
+- TransactionHandlerProxy active for Android 15/16 compatibility
+- No ANRs or crashes during testing
+
 ### Xiaomi Redmi (sunstone) — Android 14, MIUI OS 2.0.6.0
 
-This is the primary test device. Known behaviors:
-- `IPCThreadState` dlsym returns null (expected)
-- `AutoFillManagerStub` injection fails (MIUI-specific)
-- `QXPerformance.jar` is loaded as a system framework jar (Qualcomm-specific)
-- `mi_exception_log` write errors appear but are cosmetic
+Previous test device. Known behaviors:
+- `IPCThreadState` dlsym returns null (mitigated with fallbacks)
+- `AutoFillManagerStub` mService injection fails (MIUI-specific, binder hook path still works)
+- SELinux denials are cosmetic on this device
 
-### Other devices
+---
 
-No other devices have been tested. Fixes are designed to be broadly compatible:
-- BTI fix: `BTI jc` is a `NOP` on non-BTI hardware (safe on all ARM64)
-- `@CriticalNative` fix: Uses raw JNI signature which works on all ART versions
-- ArraySet fix: Type-checks at runtime, handles both `ArrayList` and `ArraySet`
-- PackageParser fallback: Auto-detects mirror breakage, works on any ROM
+## ADB Testing Quick Reference
+
+All commands require explicit component targeting on Android 14+:
+
+```bash
+# Base command format
+adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd <CMD> [--es pkg <PKG>]
+
+# List cloned apps
+adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd list
+
+# Clone an app
+adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd clone --es pkg com.twitter.android
+
+# Launch a cloned app  
+adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd launch --es pkg com.twitter.android
+
+# Clone + launch in one step
+adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd run --es pkg com.twitter.android
+
+# Install GMS from host device
+adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd gms
+
+# Kill a cloned app
+adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd kill --es pkg com.twitter.android
+
+# Kill all cloned apps
+adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd killall
+
+# Uninstall a cloned app
+adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd uninstall --es pkg com.twitter.android
+
+# Clear data for a cloned app
+adb shell am broadcast -n io.va.exposed64/io.virtualapp.dev.CmdReceiver -a io.va.exposed64.CMD --es cmd clear --es pkg com.twitter.android
+```
 
 ---
 

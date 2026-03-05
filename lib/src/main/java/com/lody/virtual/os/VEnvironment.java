@@ -198,11 +198,45 @@ public class VEnvironment {
     }
 
     // /sdcard/Android/data/<host_package>/virtual/<user>
+    // On Android 11+ (API 30+), direct access to /sdcard/Android/data/ may fail
+    // due to scoped storage restrictions. Falls back to app's own external files dir.
     public static File getVirtualPrivateStorageDir(int userId) {
+        // First try the traditional path
         String base = String.format(Locale.ENGLISH, "%s/Android/data/%s/%s/%d", Environment.getExternalStorageDirectory(),
                 VirtualCore.get().getHostPkg(), "virtual", userId);
         File file = new File(base);
-        return ensureCreated(file);
+        if (file.exists() || file.mkdirs()) {
+            return file;
+        }
+
+        // Fallback: use the host app's own external files directory (always writable on all API levels)
+        try {
+            File extFiles = VirtualCore.get().getContext().getExternalFilesDir(null);
+            if (extFiles != null) {
+                File fallback = new File(extFiles, "virtual" + File.separator + userId);
+                if (fallback.exists() || fallback.mkdirs()) {
+                    VLog.i(TAG, "Using fallback private storage at: " + fallback.getPath());
+                    return fallback;
+                }
+            }
+        } catch (Throwable e) {
+            VLog.w(TAG, "Failed to create fallback private storage: " + e.getMessage());
+        }
+
+        // Last resort: use internal storage
+        try {
+            File internalFallback = new File(VirtualCore.get().getContext().getFilesDir(), "virtual" + File.separator + userId);
+            if (internalFallback.exists() || internalFallback.mkdirs()) {
+                VLog.i(TAG, "Using internal fallback private storage at: " + internalFallback.getPath());
+                return internalFallback;
+            }
+        } catch (Throwable e) {
+            VLog.w(TAG, "Failed to create internal fallback private storage: " + e.getMessage());
+        }
+
+        // If all else fails, just return the original path (ensureCreated will log the warning)
+        VLog.w(TAG, "Unable to create virtual private storage directory: %s", base);
+        return file;
     }
 
     public static File getVirtualPrivateStorageDir(int userId, String packageName) {
