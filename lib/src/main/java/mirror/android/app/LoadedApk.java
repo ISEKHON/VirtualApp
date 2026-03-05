@@ -30,6 +30,9 @@ public class LoadedApk {
 
     public static RefMethod<ClassLoader> getClassLoader;
 
+    // Android P+ (API 28): AppComponentFactory for DI-based apps (Hilt, Dagger)
+    public static RefObject<Object> mAppComponentFactory;
+
     public static class ReceiverDispatcher {
         public static Class Class = RefClass.load(ReceiverDispatcher.class, "android.app.LoadedApk$ReceiverDispatcher");
         public static RefMethod<IInterface> getIIntentReceiver;
