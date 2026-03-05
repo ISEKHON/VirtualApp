@@ -305,6 +305,20 @@ class MethodProxies {
             String[] resolvedTypes = (String[]) args[mResolvedTypesIndex];
             int type = (int) args[0];
             int flags = (int) args[mFlagsIndex];
+
+            // Android S+ (API 31+): Ensure FLAG_IMMUTABLE or FLAG_MUTABLE is set.
+            // Some guest apps (or old Firebase libraries) don't set these flags,
+            // causing IllegalArgumentException at PendingIntent.checkPendingIntent().
+            // While the client-side check may throw before reaching here,
+            // this ensures safety for any code paths that bypass the client check.
+            if (Build.VERSION.SDK_INT >= 31) { // Build.VERSION_CODES.S
+                final int FLAG_IMMUTABLE = 1 << 26; // PendingIntent.FLAG_IMMUTABLE
+                final int FLAG_MUTABLE = 1 << 25;   // PendingIntent.FLAG_MUTABLE
+                if ((flags & FLAG_IMMUTABLE) == 0 && (flags & FLAG_MUTABLE) == 0) {
+                    flags |= FLAG_IMMUTABLE;
+                }
+            }
+
             if (args[5] instanceof Intent[]) {
                 Intent[] intents = (Intent[]) args[mIntentIndex];
                 for (int i = 0; i < intents.length; i++) {

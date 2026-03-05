@@ -87,6 +87,27 @@ public class VPackageManager {
         try {
             return getInterface().getPackageInfo(packageName, flags, userId);
         } catch (RemoteException e) {
+            // Binder transaction may exceed 1MB for apps with large manifests.
+            // Retry with stripped component flags to reduce payload size.
+            if (e instanceof android.os.DeadObjectException || e instanceof android.os.TransactionTooLargeException) {
+                try {
+                    int strippedFlags = flags & ~(
+                            android.content.pm.PackageManager.GET_ACTIVITIES
+                            | android.content.pm.PackageManager.GET_SERVICES
+                            | android.content.pm.PackageManager.GET_RECEIVERS
+                            | android.content.pm.PackageManager.GET_PROVIDERS
+                            | android.content.pm.PackageManager.GET_PERMISSIONS
+                            | android.content.pm.PackageManager.GET_CONFIGURATIONS
+                            | android.content.pm.PackageManager.GET_INSTRUMENTATION
+                    );
+                    com.lody.virtual.helper.utils.VLog.w("VPackageManager",
+                            "getPackageInfo binder too large for " + packageName
+                            + ", retrying with stripped flags: 0x" + Integer.toHexString(strippedFlags));
+                    return getInterface().getPackageInfo(packageName, strippedFlags, userId);
+                } catch (RemoteException e2) {
+                    return VirtualRuntime.crash(e2);
+                }
+            }
             return VirtualRuntime.crash(e);
         }
     }
