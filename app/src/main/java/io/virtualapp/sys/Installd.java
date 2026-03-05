@@ -277,7 +277,12 @@ public class Installd {
                 continue;
             }
 
-            AppInfoLite lite = new AppInfoLite(info.packageName, info.sourceDir, false, true);
+            // Use parent directory when split APKs exist
+            String installPath = info.sourceDir;
+            if (info.splitSourceDirs != null && info.splitSourceDirs.length > 0) {
+                installPath = new java.io.File(info.sourceDir).getParent();
+            }
+            AppInfoLite lite = new AppInfoLite(info.packageName, installPath, false, true);
             toInstalled.add(lite);
         }
         startInstallerActivity(VirtualCore.get().getContext(), toInstalled);

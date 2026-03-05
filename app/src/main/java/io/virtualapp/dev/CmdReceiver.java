@@ -127,11 +127,17 @@ public class CmdReceiver extends BroadcastReceiver {
         }
         try {
             ApplicationInfo hostInfo = context.getPackageManager().getApplicationInfo(pkg, 0);
+            // Use the APK's parent directory when split APKs exist, so PackageParser
+            // discovers and parses all splits (base + split_config.*.apk) together.
+            String installPath = hostInfo.sourceDir;
+            if (hostInfo.splitSourceDirs != null && hostInfo.splitSourceDirs.length > 0) {
+                installPath = new java.io.File(hostInfo.sourceDir).getParent();
+                Log.i(TAG, "App has " + hostInfo.splitSourceDirs.length + " split APKs, installing from directory: " + installPath);
+            }
             InstallResult result = VirtualCore.get().installPackage(
-                    hostInfo.sourceDir,
+                    installPath,
                     InstallStrategy.COMPARE_VERSION | InstallStrategy.SKIP_DEX_OPT);
             if (result.isSuccess) {
-                installSplitApks(context, pkg);
                 report(context, "CLONED: " + pkg);
             } else {
                 report(context, "CLONE_FAILED: " + pkg + " error=" + result.error);
