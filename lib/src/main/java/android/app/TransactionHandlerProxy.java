@@ -14,6 +14,7 @@ import android.os.Parcelable;
 import android.util.Log;
 import android.util.MergedConfiguration;
 import android.view.DisplayAdjustments;
+import android.view.SurfaceControl;
 
 import com.lody.virtual.client.VClientImpl;
 import com.lody.virtual.client.core.VirtualCore;
@@ -164,6 +165,23 @@ public class TransactionHandlerProxy extends ClientTransactionHandler {
         originalHandler.handleActivityConfigurationChanged(r, overrideConfig, displayId);
     }
 
+    // Android 16: handleActivityConfigurationChanged(ACR, Configuration, int, ActivityWindowInfo)
+    // Cannot use @Override since compileSdk 30 doesn't have this method
+    public void handleActivityConfigurationChanged(ActivityClientRecord r, Configuration overrideConfig, int displayId, Object activityWindowInfo) {
+        try {
+            java.lang.reflect.Method m = originalHandler.getClass().getMethod(
+                    "handleActivityConfigurationChanged",
+                    ActivityClientRecord.class, Configuration.class, int.class, activityWindowInfo.getClass());
+            m.invoke(originalHandler, r, overrideConfig, displayId, activityWindowInfo);
+        } catch (NoSuchMethodException e) {
+            // Fallback: call 3-arg version without ActivityWindowInfo
+            originalHandler.handleActivityConfigurationChanged(r, overrideConfig, displayId);
+        } catch (Throwable e) {
+            Log.w(TAG, "handleActivityConfigurationChanged 4-arg failed", e);
+            originalHandler.handleActivityConfigurationChanged(r, overrideConfig, displayId);
+        }
+    }
+
     @Override
     public void handleSendResult(IBinder token, List results, String reason) {
         originalHandler.handleSendResult(token, results, reason);
@@ -212,6 +230,23 @@ public class TransactionHandlerProxy extends ClientTransactionHandler {
     @Override
     public void handleAttachSplashScreenView(ActivityClientRecord r, Parcelable parcelable) {
         originalHandler.handleAttachSplashScreenView(r, parcelable);
+    }
+
+    // Android 16: handleAttachSplashScreenView(ACR, SplashScreenViewParcelable, SurfaceControl)
+    // Cannot use @Override since compileSdk 30 doesn't have this method
+    public void handleAttachSplashScreenView(ActivityClientRecord r, Parcelable parcelable, SurfaceControl startingWindowLeash) {
+        try {
+            java.lang.reflect.Method m = originalHandler.getClass().getMethod(
+                    "handleAttachSplashScreenView",
+                    ActivityClientRecord.class, Parcelable.class, SurfaceControl.class);
+            m.invoke(originalHandler, r, parcelable, startingWindowLeash);
+        } catch (NoSuchMethodException e) {
+            // Fallback: call 2-arg version
+            originalHandler.handleAttachSplashScreenView(r, parcelable);
+        } catch (Throwable e) {
+            Log.w(TAG, "handleAttachSplashScreenView 3-arg failed", e);
+            originalHandler.handleAttachSplashScreenView(r, parcelable);
+        }
     }
 
     @Override
@@ -364,6 +399,22 @@ public class TransactionHandlerProxy extends ClientTransactionHandler {
         originalHandler.handleConfigurationChanged(config);
     }
 
+    // Android 16: handleConfigurationChanged(Configuration, int deviceId)
+    // Cannot use @Override since compileSdk 30 doesn't have this method
+    public void handleConfigurationChanged(Configuration config, int deviceId) {
+        try {
+            java.lang.reflect.Method m = originalHandler.getClass().getMethod(
+                    "handleConfigurationChanged", Configuration.class, int.class);
+            m.invoke(originalHandler, config, deviceId);
+        } catch (NoSuchMethodException e) {
+            // Fallback: call single-arg version
+            originalHandler.handleConfigurationChanged(config);
+        } catch (Throwable e) {
+            Log.w(TAG, "handleConfigurationChanged(config, deviceId) failed", e);
+            originalHandler.handleConfigurationChanged(config);
+        }
+    }
+
     @Override
     public void handleFixedRotationAdjustments(IBinder token, DisplayAdjustments.FixedRotationAdjustments fixedRotationAdjustments) {
         originalHandler.handleFixedRotationAdjustments(token, fixedRotationAdjustments);
@@ -449,6 +500,67 @@ public class TransactionHandlerProxy extends ClientTransactionHandler {
     @Override
     public void handleNewIntent(ActivityClientRecord r, List<ReferrerIntent> intents) {
         originalHandler.handleNewIntent(r, intents);
+    }
+
+    // Android 16: reportRefresh(ActivityClientRecord)
+    // Cannot use @Override since compileSdk 30 doesn't have this method
+    public void reportRefresh(ActivityClientRecord r) {
+        try {
+            java.lang.reflect.Method m = originalHandler.getClass().getMethod(
+                    "reportRefresh", ActivityClientRecord.class);
+            m.invoke(originalHandler, r);
+        } catch (Throwable e) {
+            Log.w(TAG, "reportRefresh not available on API " + android.os.Build.VERSION.SDK_INT);
+        }
+    }
+
+    // Android 16: handleWindowContextInfoChanged(IBinder, WindowContextInfo)
+    // Cannot use @Override since compileSdk 30 doesn't have this method
+    public void handleWindowContextInfoChanged(IBinder clientToken, Object info) {
+        try {
+            java.lang.reflect.Method[] methods = originalHandler.getClass().getMethods();
+            for (java.lang.reflect.Method m : methods) {
+                if (m.getName().equals("handleWindowContextInfoChanged") && m.getParameterTypes().length == 2) {
+                    m.invoke(originalHandler, clientToken, info);
+                    return;
+                }
+            }
+        } catch (Throwable e) {
+            Log.w(TAG, "handleWindowContextInfoChanged not available", e);
+        }
+    }
+
+    // Android 16: handleWindowContextWindowRemoval(IBinder)
+    // Cannot use @Override since compileSdk 30 doesn't have this method
+    public void handleWindowContextWindowRemoval(IBinder clientToken) {
+        try {
+            java.lang.reflect.Method m = originalHandler.getClass().getMethod(
+                    "handleWindowContextWindowRemoval", IBinder.class);
+            m.invoke(originalHandler, clientToken);
+        } catch (Throwable e) {
+            Log.w(TAG, "handleWindowContextWindowRemoval not available", e);
+        }
+    }
+
+    // Android 16: prepareRelaunchActivity with ActivityWindowInfo
+    // Cannot use @Override since compileSdk 30 doesn't have this method
+    public ActivityClientRecord prepareRelaunchActivity(IBinder token, List pendingResults,
+            List pendingNewIntents, int configChanges, MergedConfiguration config,
+            boolean preserveWindow, Object activityWindowInfo) {
+        try {
+            java.lang.reflect.Method[] methods = originalHandler.getClass().getMethods();
+            for (java.lang.reflect.Method m : methods) {
+                if (m.getName().equals("prepareRelaunchActivity") && m.getParameterTypes().length == 7) {
+                    return (ActivityClientRecord) m.invoke(originalHandler, token, pendingResults,
+                            pendingNewIntents, configChanges, config, preserveWindow, activityWindowInfo);
+                }
+            }
+        } catch (Throwable e) {
+            Log.w(TAG, "prepareRelaunchActivity 7-arg not available", e);
+        }
+        // Fallback to 6-arg version
+        return originalHandler.prepareRelaunchActivity(token, pendingResults, pendingNewIntents,
+                configChanges, config, preserveWindow);
     }
 
 }

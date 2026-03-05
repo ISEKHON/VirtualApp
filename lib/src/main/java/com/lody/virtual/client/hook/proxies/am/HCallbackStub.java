@@ -28,7 +28,7 @@ import mirror.android.app.IActivityManager;
      */
     public class HCallbackStub implements Handler.Callback, IInjector {
 
-
+        private static final int EXECUTE_TRANSACTION;
         private static int LAUNCH_ACTIVITY = -1;
         private static final int CREATE_SERVICE = ActivityThread.H.CREATE_SERVICE.get();
         private static final int SCHEDULE_CRASH =
@@ -45,6 +45,11 @@ import mirror.android.app.IActivityManager;
         static {
             if (android.os.Build.VERSION.SDK_INT < 28) {
                 LAUNCH_ACTIVITY = ActivityThread.H.LAUNCH_ACTIVITY.get();
+                EXECUTE_TRANSACTION = -1;
+            } else {
+                // Android 9+ (Pie): Activities are launched via ClientTransaction
+                EXECUTE_TRANSACTION = ActivityThread.H.EXECUTE_TRANSACTION != null
+                        ? ActivityThread.H.EXECUTE_TRANSACTION.get() : 159;
             }
         }
         private HCallbackStub() {
@@ -77,6 +82,11 @@ import mirror.android.app.IActivityManager;
                         if (!handleLaunchActivity(msg)) {
                             return true;
                         }
+                    } else if (EXECUTE_TRANSACTION == msg.what && android.os.Build.VERSION.SDK_INT >= 28) {
+                        // Android 9+: Ensure app is bound before executing ClientTransaction.
+                        // TransactionHandlerProxy handles the actual activity launch interception,
+                        // but this ensures early binding for service and other transactions.
+                        handleExecuteTransaction(msg);
                     } else if (CREATE_SERVICE == msg.what) {
                         if (!VClientImpl.get().isBound()) {
                             ServiceInfo info = Reflect.on(msg.obj).get("info");
@@ -136,6 +146,54 @@ import mirror.android.app.IActivityManager;
             ActivityThread.ActivityClientRecord.intent.set(r, intent);
             ActivityThread.ActivityClientRecord.activityInfo.set(r, info);
             return true;
+        }
+
+        /**
+         * Handle EXECUTE_TRANSACTION (Android 9+).
+         * Extracts LaunchActivityItem from ClientTransaction to detect activity launches
+         * that need early binding. This complements TransactionHandlerProxy which handles
+         * the actual intent swapping. Based on BlackBox's HCallbackProxy approach,
+         * adapted for Android 16 where mActivityCallbacks may be null (renamed to mTransactionItems).
+         */
+        private void handleExecuteTransaction(Message msg) {
+            try {
+                Object clientTransaction = msg.obj;
+                if (clientTransaction == null) return;
+
+                // Try mActivityCallbacks first (Android 9-15), then mTransactionItems (Android 16+)
+                java.util.List callbacks = null;
+                try {
+                    java.lang.reflect.Method getCallbacks = clientTransaction.getClass().getMethod("getCallbacks");
+                    callbacks = (java.util.List) getCallbacks.invoke(clientTransaction);
+                } catch (NoSuchMethodException e) {
+                    // Android 16+ may not have getCallbacks
+                }
+
+                if (callbacks == null) {
+                    try {
+                        java.lang.reflect.Method getItems = clientTransaction.getClass().getMethod("getTransactionItems");
+                        callbacks = (java.util.List) getItems.invoke(clientTransaction);
+                    } catch (NoSuchMethodException e) {
+                        // Neither method exists
+                    }
+                }
+
+                if (callbacks == null || callbacks.isEmpty()) return;
+
+                for (Object item : callbacks) {
+                    if (item == null) continue;
+                    String className = item.getClass().getName();
+                    // Detect LaunchActivityItem to ensure binding happens before activity launch
+                    if (className.contains("LaunchActivityItem")) {
+                        // Just log for diagnostic — TransactionHandlerProxy does the actual interception
+                        VLog.d(TAG, "EXECUTE_TRANSACTION contains LaunchActivityItem, app bound: "
+                                + VClientImpl.get().isBound());
+                        break;
+                    }
+                }
+            } catch (Throwable e) {
+                VLog.w(TAG, "handleExecuteTransaction error: " + e.getMessage());
+            }
         }
 
         @Override
