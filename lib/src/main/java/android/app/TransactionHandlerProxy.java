@@ -260,8 +260,9 @@ public class TransactionHandlerProxy extends ClientTransactionHandler {
                 false
         );
 
-        Object packageInfo = mirror.android.app.ActivityThread.ActivityClientRecord.packageInfo.get(r);
-
+        // Clear packageInfo to force the framework to re-resolve the LoadedApk from cache.
+        // The cached LoadedApk was set up during bindApplicationNoCheck() with the guest app's
+        // APK path (including split APKs), ensuring correct Resources/AssetManager resolution.
         mirror.android.app.ActivityThread.ActivityClientRecord.packageInfo.set(r, null);
 
         VActivityManager.get().onActivityCreate(ComponentUtils.toComponentName(info), caller, token, info, intent, ComponentUtils.getTaskAffinity(info), taskId, info.launchMode, info.flags);
@@ -308,8 +309,7 @@ public class TransactionHandlerProxy extends ClientTransactionHandler {
                 false
         );
 
-        Object packageInfo = mirror.android.app.ActivityThread.ActivityClientRecord.packageInfo.get(r);
-
+        // Clear packageInfo to force the framework to re-resolve the LoadedApk from cache.
         mirror.android.app.ActivityThread.ActivityClientRecord.packageInfo.set(r, null);
 
         VActivityManager.get().onActivityCreate(ComponentUtils.toComponentName(info), caller, token, info, intent, ComponentUtils.getTaskAffinity(info), taskId, info.launchMode, info.flags);

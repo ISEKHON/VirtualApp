@@ -87,14 +87,23 @@ public final class AppInstrumentation extends InstrumentationDelegate implements
             info = r.info;
         }
         if (info != null) {
-            if (info.theme != 0) {
-                activity.setTheme(info.theme);
+            // Use getThemeResource() logic: if activity has no explicit theme,
+            // fall back to the application theme. This matches what the framework
+            // does in performLaunchActivity and ensures the correct theme is set
+            // even when info.theme == 0 (activity inherits from application theme).
+            int themeRes = info.theme;
+            if (themeRes == 0 && info.applicationInfo != null) {
+                themeRes = info.applicationInfo.theme;
+            }
+            if (themeRes != 0) {
+                activity.setTheme(themeRes);
             }
             if (activity.getRequestedOrientation() == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     && info.screenOrientation != ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) {
                 activity.setRequestedOrientation(info.screenOrientation);
             }
         }
+        
         try {
             super.callActivityOnCreate(activity, icicle);
         } catch (Throwable e) {
