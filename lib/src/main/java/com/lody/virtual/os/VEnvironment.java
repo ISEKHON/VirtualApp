@@ -160,11 +160,29 @@ public class VEnvironment {
     }
 
     public static File getVirtualStorageBaseDir() {
+        // First try the shared storage path (requires MANAGE_EXTERNAL_STORAGE on API 30+)
         File externalFilesRoot = Environment.getExternalStorageDirectory();
         if (externalFilesRoot != null) {
             File vBaseDir = new File(externalFilesRoot, "VirtualXposed");
             File vSdcard = new File(vBaseDir, "vsdcard");
-            return ensureCreated(vSdcard);
+            File result = ensureCreated(vSdcard);
+            if (result.exists() && result.isDirectory()) {
+                return result;
+            }
+        }
+        // Fallback: use the host app's own external files directory (always writable)
+        try {
+            File extFiles = VirtualCore.get().getContext().getExternalFilesDir(null);
+            if (extFiles != null) {
+                File vSdcard = new File(extFiles, "vsdcard");
+                File result = ensureCreated(vSdcard);
+                if (result.exists() && result.isDirectory()) {
+                    VLog.i(TAG, "Using fallback virtual storage at: " + result.getPath());
+                    return result;
+                }
+            }
+        } catch (Throwable e) {
+            VLog.w(TAG, "Failed to create fallback virtual storage", e);
         }
         return null;
     }

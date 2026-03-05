@@ -613,8 +613,11 @@ public final class VClientImpl extends IVClient.Stub {
 
         File vsDir = VEnvironment.getVirtualStorageDir(info.packageName, userId);
         if (vsDir == null || !vsDir.exists() || !vsDir.isDirectory()) {
+            VLog.w(TAG, "Virtual storage directory unavailable: " + (vsDir != null ? vsDir.getPath() : "null")
+                    + " — storage redirect disabled for " + info.packageName);
             return;
         }
+        VLog.i(TAG, "Virtual storage for " + info.packageName + ": " + vsDir.getPath());
 
         HashSet<String> storageRoots = getMountPoints();
         storageRoots.add(Environment.getExternalStorageDirectory().getAbsolutePath());
