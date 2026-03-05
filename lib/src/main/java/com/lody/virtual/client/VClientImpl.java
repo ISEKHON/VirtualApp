@@ -153,6 +153,16 @@ public final class VClientImpl extends IVClient.Stub {
         return VUserHandle.getAppId(vuid);
     }
 
+    /**
+     * Returns the LoadedApk from the bound application's context.
+     * Used by TransactionHandlerProxy to set the correct LoadedApk on ActivityClientRecords
+     * instead of null, ensuring the activity uses the same Resources/AssetManager
+     * that was set up during bindApplication.
+     */
+    public Object getLoadedApk() {
+        return mBoundApplication != null ? mBoundApplication.info : null;
+    }
+
     public ClassLoader getClassLoader(ApplicationInfo appInfo) {
         Context context = createPackageContext(appInfo.packageName);
         return context.getClassLoader();
@@ -377,7 +387,32 @@ public final class VClientImpl extends IVClient.Stub {
         ClassLoader cl = LoadedApk.getClassLoader.call(data.info);
         if (BuildCompat.isS()) {
             ClassLoader parent = cl.getParent();
-            Reflect.on(cl).set("parent", new DelegateLastClassLoader("/system/framework/android.test.base.jar", parent));
+            // Inject android.test.base into parent chain
+            parent = new DelegateLastClassLoader("/system/framework/android.test.base.jar", parent);
+            // Inject org.apache.http.legacy for apps that need it (targetSdk < 28 or uses-library declared)
+            if (data.appInfo.sharedLibraryFiles != null) {
+                for (String lib : data.appInfo.sharedLibraryFiles) {
+                    if (lib != null && lib.contains("org.apache.http.legacy")) {
+                        parent = new DelegateLastClassLoader(lib, parent);
+                        VLog.i(TAG, "Injected Apache HTTP legacy jar into ClassLoader: " + lib);
+                        break;
+                    }
+                }
+            }
+            Reflect.on(cl).set("parent", parent);
+        }
+
+        // Android P+ (API 28): Set the guest app's AppComponentFactory on the LoadedApk.
+        // This is critical for apps using Hilt/Dagger DI, which require AppComponentFactory
+        // to instantiate activities, services, etc. with injected dependencies.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && data.appInfo.appComponentFactory != null) {
+            try {
+                Object factory = cl.loadClass(data.appInfo.appComponentFactory).newInstance();
+                LoadedApk.mAppComponentFactory.set(data.info, factory);
+                VLog.i(TAG, "Set AppComponentFactory: " + data.appInfo.appComponentFactory);
+            } catch (Throwable e) {
+                VLog.w(TAG, "Failed to set AppComponentFactory: " + data.appInfo.appComponentFactory, e);
+            }
         }
 
         if (Build.VERSION.SDK_INT >= 30)
