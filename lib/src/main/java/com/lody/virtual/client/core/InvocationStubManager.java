@@ -59,6 +59,7 @@ import com.lody.virtual.client.hook.proxies.wifi_scanner.WifiScannerStub;
 import com.lody.virtual.client.hook.proxies.window.WindowManagerStub;
 import com.lody.virtual.client.interfaces.IInjector;
 import com.lody.virtual.helper.compat.BuildCompat;
+import com.lody.virtual.helper.utils.VLog;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -77,6 +78,8 @@ import static android.os.Build.VERSION_CODES.N;
  */
 public final class InvocationStubManager {
 
+    private static final String TAG = "InvocationStubManager";
+
     private static InvocationStubManager sInstance = new InvocationStubManager();
     private static boolean sInit;
 
@@ -90,8 +93,19 @@ public final class InvocationStubManager {
 	}
 
 	void injectAll() throws Throwable {
+		// Inject each service proxy independently. On newer Android releases a
+		// single framework service may be renamed/removed/refactored; if that one
+		// injector throws we log it and continue so the remaining proxies still
+		// install, instead of letting one incompatible service take down the whole
+		// sandbox. This is what keeps the engine resilient across future API levels.
 		for (IInjector injector : mInjectors.values()) {
-			injector.inject();
+			try {
+				injector.inject();
+			} catch (Throwable e) {
+				VLog.e(TAG, "Failed to inject %s on API %d (continuing): %s",
+						injector.getClass().getSimpleName(), Build.VERSION.SDK_INT,
+						android.util.Log.getStackTraceString(e));
+			}
 		}
 		// XXX: Lazy inject the Instrumentation,
 		addInjector(AppInstrumentation.getDefault());

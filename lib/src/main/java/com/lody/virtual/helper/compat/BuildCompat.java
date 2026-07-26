@@ -8,6 +8,31 @@ import android.os.Build;
 
 public class BuildCompat {
 
+    /**
+     * Highest stable API level this engine has been explicitly adapted for.
+     * Future previews (API &gt; this) are treated as "at least latest known" so
+     * version-gated code takes the newest branch instead of an obsolete one.
+     */
+    public static final int LATEST_KNOWN_API = 36; // Android 16
+
+    /**
+     * Forward-compatible "running on at least {@code api}" check. Prefer this over
+     * hand-written {@code SDK_INT >= X} so behavior is consistent and preview builds
+     * of {@code api} are handled via {@link #getPreviewSDKInt()}.
+     */
+    public static boolean isAtLeast(int api) {
+        return isAndroidLevelPreview(api);
+    }
+
+    /**
+     * True when the device runs the latest API this engine knows about, or newer
+     * (including a not-yet-released preview). Use this to gate "newest Android"
+     * handling so an unknown future release does not fall back to legacy behavior.
+     */
+    public static boolean isAtLeastLatestKnown() {
+        return isAndroidLevel(LATEST_KNOWN_API);
+    }
+
     public static int getPreviewSDKInt() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
@@ -54,14 +79,14 @@ public class BuildCompat {
         return isAndroidLevel(34);
     }
 
-    /** Android 15 VanillaIceCream (API 35) */
+    /** Android 15 VanillaIceCream (API 35), including previews. */
     public static boolean isV() {
-        return isAndroidLevel(35);
+        return isAtLeast(35);
     }
 
-    /** Android 16 (API 36) */
+    /** Android 16 (API 36), including previews. */
     public static boolean isW() {
-        return isAndroidLevel(36);
+        return isAtLeast(36);
     }
 
     private static boolean isAndroidLevelPreview(int level) {
