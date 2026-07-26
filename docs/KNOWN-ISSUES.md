@@ -50,13 +50,24 @@ Android 14+ increasingly restricts launching activities from the background. Vir
 
 ### 3. Fake Signature on Certificate Collection Failure
 
-**Status:** Known, mitigated
+**Status:** Largely fixed (real signature now recovered from the APK)
 
-If `PackageParser.collectCertificates()` fails on a particular ROM, VirtualApp falls back to a fake signature constant. Apps that verify their own signature (e.g., Google Play Services, banking apps) will detect a mismatch.
+When `PackageParser.collectCertificates()` fails on a ROM (common on Android 14+), VirtualApp now
+recovers the app's **real** signer certificate directly from the APK Signing Block (v2/v3/v3.1)
+via `ApkSignatureExtractor`, before ever using the fake-signature fallback. Apps that verify their
+own signing certificate — Google Play Services, Google Sign-In, most banking apps — therefore see
+their genuine certificate and pass. This is what enables real Google login inside the sandbox.
 
-**Impact:** Some apps may refuse to run or show "tampered" warnings.
+The hard-coded fake signature (`FAKE_SIG`) is now only used as a true last resort for genuinely
+unsigned or unreadable APKs, and is logged loudly (`FAKE_SIG fallback`) so any remaining case is
+diagnosable in `logcat`.
 
-**Workaround:** Use apps that don't perform strict signature verification, or install a Xposed module for signature spoofing (requires Xposed to be working).
+**Remaining impact:** an APK that is v1-only signed *and* whose `collectCertificates()` also fails
+would still fall back to `FAKE_SIG`. Such apps are rare today (v2+ signing is required since
+Android 11 targetSdk).
+
+**Note:** this preserves the *real* signature; it does **not** and cannot defeat hardware-backed
+Play Integrity / SafetyNet (see the GMS / integrity note below).
 
 ---
 

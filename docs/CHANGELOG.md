@@ -4,7 +4,61 @@ All notable changes to VirtualApp are documented in this file.
 
 ---
 
-## [Unreleased] — Android 11-16 (API 30-36) Comprehensive Compatibility
+## [Unreleased] — Google Login, Forward-Compatibility & AGP 8
+
+### Summary
+
+Makes **real Google account login work inside cloned apps and games** (non-root), modernizes the
+build toolchain to AGP 8 so the engine can compile against Android 15/16, and makes the
+compatibility layer forward-compatible so future Android releases degrade gracefully instead of
+crashing.
+
+### Added
+
+- **Real signature preservation (`ApkSignatureExtractor`)** — a pure-Java reader for the APK
+  Signing Block (v2/v3/v3.1) that recovers an app's **genuine** signer certificate directly from
+  the APK. Used as a fallback tier in `PackageParserEx.parsePackage()` before the fake signature,
+  so apps that verify their own signing certificate (Google Play Services, Google Sign-In,
+  banking apps) present their real certificate and pass. This is what unlocks Google login inside
+  the sandbox on Android 14+ where `collectCertificates()` frequently fails.
+- **`BuildCompat.isAtLeast(int)` / `isAtLeastLatestKnown()` / `LATEST_KNOWN_API`** — forward-
+  compatible version helpers; previously-dead `isV()`/`isW()` are now preview-aware and wired.
+- **`GmsSupport.isHostGmsAvailable()`** — lets callers detect (and message the user) when the host
+  device has no Google Play Services to copy into the sandbox.
+
+### Changed
+
+- **`InvocationStubManager.injectAll()`** — each service proxy now injects independently inside a
+  try/catch. If one framework service is renamed/removed on a newer Android, that single proxy is
+  skipped (logged) instead of aborting injection for **all** remaining services. Key resilience
+  change for surviving future API levels.
+- **`PackageParserEx`** — `FAKE_SIG` is now a genuine last resort (only for unsigned/unreadable
+  APKs) and is logged loudly; the unconditional `FAKE_SIG` force-set in `buildPackageCache` now
+  prefers the recovered real signature.
+- **GMS keep-alive (`VASettings.PRIVILEGE_APPS`)** — early `BOOT_COMPLETED` priming extended from
+  `gms` alone to the full auth trio `gsf` + `gms` + `com.android.vending`, so the account/auth
+  surface is resident before dependent apps launch.
+- **`GmsSupport.installGApps()`** — documented dependency ordering (GSF/GMS before Play Store),
+  per-package install/skip logging, and a host-availability warning.
+- **Build toolchain (AGP 8)** — Android Gradle Plugin `7.4.2 → 8.5.2`, Gradle `7.5 → 8.7`;
+  `lib` `compileSdk 30 → 35`, `app` `compileSdk 34 → 36` and `targetSdk 33 → 35`; `namespace`
+  moved into the Gradle DSL (`com.lody.virtual`, `io.virtualapp`) and removed from the manifests;
+  `buildConfig` feature enabled explicitly; removed the removed `android.useDeprecatedNdk` flag and
+  the incompatible `gradle-experimental` classpath. NDK intentionally left at `21.4.7075529` (the
+  native engine targets syscalls, not the SDK, so a bump adds risk with no benefit). **Requires
+  JDK 17.**
+
+### Honest scope note (non-root integrity)
+
+Hardware-backed **Play Integrity / SafetyNet strong verdicts cannot be forged by a no-root
+virtualization engine.** Basic Google Sign-In (OAuth / account picker / auth token) works because
+it depends on real GMS + the app's genuine signature — both of which this release fixes. Apps or
+games that hard-gate behind a strong Play Integrity verdict (e.g. many competitive titles) will
+still fail the integrity check; that is out of scope and not attempted. See KNOWN-ISSUES.md.
+
+---
+
+## [Prior Unreleased] — Android 11-16 (API 30-36) Comprehensive Compatibility
 
 ### Summary
 
