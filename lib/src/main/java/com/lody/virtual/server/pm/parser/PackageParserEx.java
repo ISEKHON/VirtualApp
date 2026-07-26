@@ -55,6 +55,12 @@ public class PackageParserEx {
     public static VPackage parsePackage(File packageFile) throws Throwable {
         PackageParser parser = PackageParserCompat.createParser(packageFile);
         PackageParser.Package p = PackageParserCompat.parsePackage(parser, packageFile, 0);
+        // Real signatures recovered directly from the APK signing block, used as a
+        // fallback source when the framework collectCertificates() path breaks
+        // (common on Android 14+ vendor ROMs). Preserving the real signer cert is
+        // what lets self-verifying apps (Google Play Services, Google Sign-In,
+        // banking apps) work inside the sandbox.
+        Signature[] realSigs = null;
         if (p.requestedPermissions.contains("android.permission.FAKE_PACKAGE_SIGNATURE")
                 && p.mAppMetaData != null
                 && p.mAppMetaData.containsKey("fake-signature")) {
@@ -66,13 +72,23 @@ public class PackageParserEx {
                 PackageParserCompat.collectCertificates(parser, p, PackageParser.PARSE_IS_SYSTEM);
             } catch (Throwable e) {
                 VLog.e(TAG, "collectCertificates failed", e);
-                // On Android 14+, collectCertificates may fail due to internal API changes.
-                // Fall back to fake signature to allow installation.
-                VLog.w(TAG, "Using fake signature as fallback: " + p.packageName);
-                buildSignature(p, new Signature[]{new Signature(FAKE_SIG)});
+                // Tier 2: recover the real signer certificate straight from the APK
+                // signing block (v2/v3). This survives ROM-specific collectCertificates
+                // breakage and, unlike FAKE_SIG, keeps the app's genuine signature.
+                realSigs = ApkSignatureExtractor.extract(packageFile);
+                if (realSigs != null && realSigs.length > 0) {
+                    VLog.i(TAG, "Recovered real signature via APK signing block: " + p.packageName);
+                    buildSignature(p, realSigs);
+                } else {
+                    // Tier 3 (last resort): fake signature so installation can proceed.
+                    // Apps that self-verify or use Google services WILL detect this.
+                    VLog.w(TAG, "FAKE_SIG fallback (self-verifying / Google login apps will fail): "
+                            + p.packageName);
+                    buildSignature(p, new Signature[]{new Signature(FAKE_SIG)});
+                }
             }
         }
-        return buildPackageCache(p);
+        return buildPackageCache(p, realSigs);
     }
 
     private static void buildSignature(PackageParser.Package p, Signature[] signatures) {
@@ -180,6 +196,10 @@ public class PackageParserEx {
     }
 
     private static VPackage buildPackageCache(PackageParser.Package p) {
+        return buildPackageCache(p, null);
+    }
+
+    private static VPackage buildPackageCache(PackageParser.Package p, Signature[] fallbackSigs) {
         VPackage cache = new VPackage();
         cache.activities = new ArrayList<>(p.activities.size());
         cache.services = new ArrayList<>(p.services.size());
@@ -277,9 +297,24 @@ public class PackageParserEx {
             } catch (Throwable e) {
                 VLog.w(TAG, "buildPackageCache: signing info extraction failed", e);
             }
-            // Ensure mSignatures is set even if mirror extraction failed
-            if (cache.mSignatures == null) {
-                cache.mSignatures = new Signature[]{new Signature(FAKE_SIG)};
+            // Ensure mSignatures is set even if mirror extraction failed.
+            // Prefer the real signer certificate recovered from the APK signing
+            // block; only fall back to FAKE_SIG when no real signature is available.
+            if (cache.mSignatures == null || cache.mSignatures.length == 0) {
+                Signature[] real = (fallbackSigs != null && fallbackSigs.length > 0)
+                        ? fallbackSigs : null;
+                if (real == null) {
+                    // Last-ditch: try to read the signing block directly from the APK.
+                    real = ApkSignatureExtractor.extract(new File(p.baseCodePath));
+                }
+                if (real != null && real.length > 0) {
+                    cache.mSignatures = real;
+                    VLog.i(TAG, "buildPackageCache: using real signature for " + p.packageName);
+                } else {
+                    VLog.w(TAG, "buildPackageCache: FAKE_SIG fallback (self-verifying apps will fail): "
+                            + p.packageName);
+                    cache.mSignatures = new Signature[]{new Signature(FAKE_SIG)};
+                }
             }
         }
         cache.mAppMetaData = p.mAppMetaData;
