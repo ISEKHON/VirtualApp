@@ -1,17 +1,23 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdk 34
+    namespace 'io.virtualapp'
+    compileSdk 36
     defaultConfig {
         applicationId "io.va.exposed64"
         minSdkVersion 21
-        targetSdkVersion 33
+        targetSdkVersion 35
         versionCode 1
         versionName "1.0.0"
         multiDexEnabled false
         ndk {
             abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
         }
+    }
+    buildFeatures {
+        // BuildConfig is referenced (e.g. CmdReceiver uses BuildConfig.APPLICATION_ID);
+        // AGP 8 turns this feature off by default, so enable it explicitly.
+        buildConfig true
     }
     sourceSets {
         main {

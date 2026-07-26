@@ -17,10 +17,10 @@ buildscript {
 
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.4.2'
-        classpath 'com.android.tools.build:gradle-experimental:0.11.1'
-        // We recommend changing it to the latest version from our changelog:
-        // https://docs.fabric.io/android/changelog.html#fabric-gradle-plugin
+        // AGP 8.x is required to compile against Android 15/16 (compileSdk 35/36).
+        // Requires JDK 17 and Gradle 8.7 (see gradle/wrapper/gradle-wrapper.properties).
+        classpath 'com.android.tools.build:gradle:8.5.2'
+        // gradle-experimental:0.11.1 removed — it is incompatible with AGP 8 and unused.
     }
 }
 

@@ -1,8 +1,13 @@
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 30
-    buildToolsVersion '30.0.0'
+    namespace 'com.lody.virtual'
+    compileSdk 35
+    // buildToolsVersion omitted: AGP selects the version required by compileSdk (35.0.0).
+    // ndkVersion intentionally kept at 21.4.7075529 — the native engine
+    // (And64InlineHook / Substrate / IOUniformer) targets syscalls, not the SDK, so
+    // bumping the NDK adds risk with no functional benefit. If AGP 8.5 rejects r21,
+    // install NDK r25c (25.2.9519653) or r26 and update the line below.
 
     defaultConfig {
         minSdkVersion 21
