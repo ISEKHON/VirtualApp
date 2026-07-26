@@ -17,8 +17,15 @@ public class VASettings {
     public static String STUB_EXCLUDE_FROM_RECENT_ACTIVITY = StubExcludeFromRecentActivity.class.getName();
     public static String STUB_CP_AUTHORITY = "virtual_stub_";
     public static int STUB_COUNT = 50;
+    // Apps that receive an early ACTION_BOOT_COMPLETED so they initialize and stay
+    // resident before dependent apps launch. GMS is the auth broker for every
+    // signed-in app; GSF backs its framework services and the Play Store hosts the
+    // account/checkin surface, so priming the whole trio makes Google login inside
+    // the sandbox far more reliable.
     public static String[] PRIVILEGE_APPS = new String[]{
-            "com.google.android.gms"
+            "com.google.android.gsf",
+            "com.google.android.gms",
+            "com.android.vending"
     };
 
     /**
